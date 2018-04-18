@@ -309,10 +309,18 @@ func GetCubeDimensions(tm1 Tm1Instance, cube string) (dims DimensionsResponse, e
 }
 
 //ExecuteProcess executes tm1 process
-func ExecuteProcess(tm1 Tm1Instance, process string, p string) (e error) {
+func ExecuteProcess(tm1 Tm1Instance, process string, params []ProcessParameter) (e error) {
 
-	parameters := `{"Parameters":[{"Name":"pEl","Value":"` + p + `"}]}`
+	parameters := `{"Parameters":[`
+	for i, p := range params {
+		parameters += `{"Name":"` + p.Name + `","Value":"` + p.Value + `"}`
+		if i != (len(params) - 1) {
+			parameters += `,`
+		}
+	}
 
+	parameters += `]}`
+	fmt.Println("PARAMETERS:" + parameters)
 	var payload = []byte(parameters)
 	req, _ := http.NewRequest("POST", tm1.GetProtocol()+"://"+tm1.Server+":"+tm1.HttpPort+"/api/v1/Processes('"+process+"')/tm1.Execute", bytes.NewBuffer(payload))
 	req.Header.Set("Content-Type", "application/json")
