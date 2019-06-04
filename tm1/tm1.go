@@ -14,6 +14,45 @@ import (
 	"time"
 )
 
+//Process describes tm1 TI process
+type Process struct {
+	OdataContext      string `json:"@odata.context"`
+	OdataEtag         string `json:"@odata.etag"`
+	Name              string `json:"Name"`
+	HasSecurityAccess bool   `json:"HasSecurityAccess"`
+	PrologProcedure   string `json:"PrologProcedure"`
+	MetadataProcedure string `json:"MetadataProcedure"`
+	DataProcedure     string `json:"DataProcedure"`
+	EpilogProcedure   string `json:"EpilogProcedure"`
+	DataSource        struct {
+		Type                    string `json:"Type"`
+		ASCIIDecimalSeparator   string `json:"asciiDecimalSeparator"`
+		ASCIIDelimiterChar      string `json:"asciiDelimiterChar"`
+		ASCIIDelimiterType      string `json:"asciiDelimiterType"`
+		ASCIIHeaderRecords      int    `json:"asciiHeaderRecords"`
+		ASCIIQuoteCharacter     string `json:"asciiQuoteCharacter"`
+		ASCIIThousandSeparator  string `json:"asciiThousandSeparator"`
+		DataSourceNameForClient string `json:"dataSourceNameForClient"`
+		DataSourceNameForServer string `json:"dataSourceNameForServer"`
+	} `json:"DataSource"`
+	Parameters []struct {
+		Name   string `json:"Name"`
+		Prompt string `json:"Prompt"`
+		Value  int    `json:"Value"`
+		Type   string `json:"Type"`
+	} `json:"Parameters"`
+	Variables []struct {
+		Name      string `json:"Name"`
+		Type      string `json:"Type"`
+		Position  int    `json:"Position"`
+		StartByte int    `json:"StartByte"`
+		EndByte   int    `json:"EndByte"`
+	} `json:"Variables"`
+	Attributes struct {
+		Caption string `json:"Caption"`
+	} `json:"Attributes"`
+}
+
 //ProcessParameter
 type ProcessParameter struct {
 	Name  string
@@ -303,12 +342,12 @@ func (s Tm1Session) Do(req *http.Request) ([]byte, error) {
 //Tm1SendHttpRequest
 func (s *Tm1Session) Tm1SendHttpRequest(method, path string, body interface{}) ([]byte, error) {
 	req, err := s.NewRequest(method, path, body)
-	if err!=nil{
-		return nil,err
+	if err != nil {
+		return nil, err
 	}
 	res, err := s.Do(req)
-	if err!=nil{
-		return nil,err
+	if err != nil {
+		return nil, err
 	}
 	return res, nil
 }
@@ -416,8 +455,8 @@ func (s Tm1Session) CubeCreate(cube Cube) error {
 //DimensionCreate creates new dimension
 func (s Tm1Session) DimensionCreate(dim Dimension) error {
 
-	p1,_ := json.Marshal(dim)
-	payload:=string(p1)
+	p1, _ := json.Marshal(dim)
+	payload := string(p1)
 	//fmt.Println(payload)
 	_, err := s.Tm1SendHttpRequest("POST", "/Dimensions", payload)
 

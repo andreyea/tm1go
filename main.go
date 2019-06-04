@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	sdata := tm1.NewSession("https://localhost:8010/api/v1", "admin", "apple", "")
+	sdata := tm1.NewSession("http://localhost:8010/api/v1", "admin", "apple", "")
 
 	err := sdata.Login()
 	if err != nil {
