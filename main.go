@@ -32,7 +32,9 @@ func main() {
 		fmt.Println(err)
 
 	}
-	err = sdata.Logout()
+
+	
+	err= sdata.Logout()
 	if err != nil {
 		fmt.Println(err)
 		return

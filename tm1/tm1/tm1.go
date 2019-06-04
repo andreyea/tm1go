@@ -28,10 +28,11 @@ type DimensionsResponse struct {
 
 //Dimension is describing a single dimension
 type Dimension struct {
-	OdataEtag              string `json:"@odata.etag"`
-	Name                   string `json:"Name"`
-	UniqueName             string `json:"UniqueName"`
-	AllLeavesHierarchyName string `json:"AllLeavesHierarchyName"`
+	OdataEtag              string      `json:"@odata.etag"`
+	Name                   string      `json:"Name"`
+	Hierarchies            []Hierarchy `json:"Hierarchies"`
+	UniqueName             string      `json:"UniqueName"`
+	AllLeavesHierarchyName string      `json:"AllLeavesHierarchyName"`
 }
 
 //Cell is a single cell of a cellset
@@ -51,12 +52,13 @@ type Axis struct {
 
 //Hierarchy
 type Hierarchy struct {
-	OdataEtag   string `json:"@odata.etag"`
-	Name        string `json:"Name"`
-	UniqueName  string `json:"UniqueName"`
-	Cardinality int    `json:"Cardinality"`
-	Structure   int    `json:"Structure"`
-	Visible     bool   `json:"Visible"`
+	OdataEtag   string    `json:"@odata.etag"`
+	Name        string    `json:"Name"`
+	UniqueName  string    `json:"UniqueName"`
+	Cardinality int       `json:"Cardinality"`
+	Elements    []Element `json:"Elements"`
+	Structure   int       `json:"Structure"`
+	Visible     bool      `json:"Visible"`
 }
 
 //Member
@@ -84,6 +86,17 @@ type Cellset struct {
 	Cells        []Cell `json:"Cells"`
 }
 
+type Element struct {
+	OdataContext string            `json:"@odata.context"`
+	OdataEtag    string            `json:"@odata.etag"`
+	Name         string            `json:"Name"`
+	UniqueName   string            `json:"UniqueName"`
+	Type         string            `json:"Type"`
+	Level        int               `json:"Level"`
+	Index        int               `json:"Index"`
+	Attributes   map[string]string `json:"Attributes"`
+}
+
 //ExecuteProcessResponse error response from executing process
 type ExecuteProcessResponse struct {
 	Error struct {
@@ -96,6 +109,7 @@ type ExecuteProcessResponse struct {
 type Cube struct {
 	OdataEtag         string      `json:"@odata.etag"`
 	Name              string      `json:"Name"`
+	Dimensions        []Dimension `json:"Dimensions"`
 	Rules             string      `json:"Rules"`
 	DrillthroughRules interface{} `json:"DrillthroughRules"`
 	LastSchemaUpdate  time.Time   `json:"LastSchemaUpdate"`
@@ -350,7 +364,7 @@ func (t Thread) Cancel(s *Tm1Session) error {
 	return nil
 }
 
-//Cancel a thread unbound
+//ThreadCancel cancels a thread (unbound)
 func (s Tm1Session) ThreadCancel(id string) error {
 	_, err := s.Tm1SendHttpRequest("POST", "/Threads('"+id+"')/tm1.CancelOperation", "{}")
 
@@ -358,4 +372,48 @@ func (s Tm1Session) ThreadCancel(id string) error {
 		return err
 	}
 	return nil
+}
+
+//CubeCreate creates new cube
+func (s Tm1Session) CubeCreate(cube Cube) error {
+
+	var dims string
+
+	for i, v := range cube.Dimensions {
+		if len(cube.Dimensions) == i {
+			dims = dims + `"Dimensions('` + v.Name + `')"`
+		} else {
+			dims = dims + `"Dimensions('` + v.Name + `')",`
+		}
+
+	}
+
+	payload := `
+	{
+		"Name": "` + cube.Name + `",
+		"Dimensions@odata.bind": [` + dims + `]
+	}
+	`
+
+	_, err := s.Tm1SendHttpRequest("POST", "/Cubes", payload)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//DimensionCreate creates new dimension
+func (s Tm1Session) DimensionCreate(dim Dimension) error {
+
+	p1,_ := json.Marshal(dim)
+	payload:=string(p1)
+
+	_, err := s.Tm1SendHttpRequest("POST", "/Dimensions", payload)
+
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
