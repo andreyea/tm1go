@@ -1,3 +1,3 @@
-module tm1
+module github.com/andreyea/tm1go
 
 go 1.12

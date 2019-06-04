@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"tm1/tm1/tm1"
+
+	"github.com/andreyea/tm1go/tm1"
 )
 
 func main() {
-	sdata := tm1.NewSession("https://localhost:8010/api/v1", "usr1", "apple", "")
+	sdata := tm1.NewSession("https://localhost:8010/api/v1", "admin", "apple", "")
 
 	err := sdata.Login()
 	if err != nil {
@@ -15,26 +16,38 @@ func main() {
 		return
 	}
 
-	mdx := "select [x version].members on 0, [x el].members on 1 from [x Cube]"
-
-	cellset, err := sdata.ExecuteMdx(mdx)
-
-	fmt.Printf("%v\n", len(cellset.Cells))
-
-	for _, v := range cellset.Cells {
-		if v.Value == nil {
-			fmt.Println(0)
-			continue
-		}
-		fmt.Println(v.Value)
-	}
+	h1 := tm1.Hierarchy{}
+	d1 := tm1.Dimension{}
+	d1.Name = "tm1goDimensionNew_"
+	h1.Name = "tm1goDimensionNew_"
+	h1.Elements = []tm1.Element{}
+	d1.Hierarchies = []tm1.Hierarchy{h1}
+	fmt.Println(d1)
+	err = sdata.DimensionCreate(d1)
 	if err != nil {
 		fmt.Println(err)
-
 	}
 
-	
-	err= sdata.Logout()
+	/*
+		mdx := "select [x version].members on 0, [x el].members on 1 from [x Cube]"
+
+		cellset, err := sdata.ExecuteMdx(mdx)
+
+		fmt.Printf("%v\n", len(cellset.Cells))
+
+		for _, v := range cellset.Cells {
+			if v.Value == nil {
+				fmt.Println(0)
+				continue
+			}
+			fmt.Println(v.Value)
+		}
+		if err != nil {
+			fmt.Println(err)
+
+		}
+	*/
+	err = sdata.Logout()
 	if err != nil {
 		fmt.Println(err)
 		return

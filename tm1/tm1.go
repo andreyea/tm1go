@@ -163,7 +163,7 @@ func (s Tm1Session) GetCubes() ([]Cube, error) {
 	cubes := CubesResponse{}
 	req, err := s.NewRequest("GET", "/Cubes", nil)
 	if err != nil {
-		fmt.Println(err)
+
 		return nil, err
 	}
 
@@ -279,12 +279,17 @@ func (s Tm1Session) NewRequest(method, path string, body interface{}) (*http.Req
 	return req, nil
 }
 
-//Do method
+//Do method sends http request to tm1 instance
 func (s Tm1Session) Do(req *http.Request) ([]byte, error) {
 	resp, err := s.httpClient.Do(req)
+
 	if resp.StatusCode >= 400 {
-		return nil, errors.New("Login failed with a status code: " + resp.Status)
+		//fix this in the future. add proper error handling and message output
+		content, _ := ioutil.ReadAll(resp.Body)
+		fmt.Println(string(content))
+		return content, errors.New("Request failed with a status code: " + resp.Status)
 	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +302,14 @@ func (s Tm1Session) Do(req *http.Request) ([]byte, error) {
 
 //Tm1SendHttpRequest
 func (s *Tm1Session) Tm1SendHttpRequest(method, path string, body interface{}) ([]byte, error) {
-	req, _ := s.NewRequest(method, path, body)
-	res, _ := s.Do(req)
+	req, err := s.NewRequest(method, path, body)
+	if err!=nil{
+		return nil,err
+	}
+	res, err := s.Do(req)
+	if err!=nil{
+		return nil,err
+	}
 	return res, nil
 }
 
@@ -344,7 +355,6 @@ func (s Tm1Session) GetThreads() ([]Thread, error) {
 	threads := ThreadsResponse{}
 	req, err := s.NewRequest("GET", "/Threads?$expand=Session", nil)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -408,8 +418,10 @@ func (s Tm1Session) DimensionCreate(dim Dimension) error {
 
 	p1,_ := json.Marshal(dim)
 	payload:=string(p1)
-
+	//fmt.Println(payload)
 	_, err := s.Tm1SendHttpRequest("POST", "/Dimensions", payload)
+
+	//fmt.Println(zzz)
 
 	if err != nil {
 		return err
