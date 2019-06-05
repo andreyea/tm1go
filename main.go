@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	sdata := tm1.NewSession("http://localhost:8010/api/v1", "admin", "apple", "")
+	sdata := tm1.NewSession("https://localhost:8010/api/v1", "admin", "apple", "")
 
 	err := sdata.Login()
 	if err != nil {
@@ -16,17 +16,39 @@ func main() {
 		return
 	}
 
-	h1 := tm1.Hierarchy{}
-	d1 := tm1.Dimension{}
-	d1.Name = "tm1goDimensionNew_"
-	h1.Name = "tm1goDimensionNew_"
-	h1.Elements = []tm1.Element{}
-	d1.Hierarchies = []tm1.Hierarchy{h1}
-	fmt.Println(d1)
-	err = sdata.DimensionCreate(d1)
+	tis, err := sdata.GetProcesses()
 	if err != nil {
+		fmt.Println("error during proccesses get")
 		fmt.Println(err)
+		return
 	}
+
+	for _, v := range tis {
+		//fmt.Println(v.Name)
+		if v.Name == "!temp" {
+			v.Parameters[0].Value = 10
+			//fmt.Println(v)
+			zzz, err := sdata.ExecuteProcess(v)
+			if err != nil {
+				fmt.Println("error during proccesses run")
+				fmt.Println(err)
+			}
+			fmt.Println("Execute Process Result:")
+			fmt.Println(zzz)
+		}
+	}
+
+	//h1 := tm1.Hierarchy{}
+	//d1 := tm1.Dimension{}
+	//d1.Name = "tm1goDimensionNew_"
+	//h1.Name = "tm1goDimensionNew_"
+	//h1.Elements = []tm1.Element{}
+	//d1.Hierarchies = []tm1.Hierarchy{h1}
+	//fmt.Println(d1)
+	//err = sdata.DimensionCreate(d1)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 
 	/*
 		mdx := "select [x version].members on 0, [x el].members on 1 from [x Cube]"

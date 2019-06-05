@@ -35,12 +35,7 @@ type Process struct {
 		DataSourceNameForClient string `json:"dataSourceNameForClient"`
 		DataSourceNameForServer string `json:"dataSourceNameForServer"`
 	} `json:"DataSource"`
-	Parameters []struct {
-		Name   string `json:"Name"`
-		Prompt string `json:"Prompt"`
-		Value  int    `json:"Value"`
-		Type   string `json:"Type"`
-	} `json:"Parameters"`
+	Parameters []ProcessParameter `json:"Parameters"`
 	Variables []struct {
 		Name      string `json:"Name"`
 		Type      string `json:"Type"`
@@ -53,11 +48,20 @@ type Process struct {
 	} `json:"Attributes"`
 }
 
-//ProcessParameter
+//ProcessParameter describes one parameter in a TI process when received
 type ProcessParameter struct {
-	Name  string
-	Value string
+	Name   string `json:"Name"`
+		Prompt string `json:"Prompt"`
+		Value  interface{}    `json:"Value"`
+		Type   string `json:"Type"`
 }
+
+//ProcessParameter describes one parameter in a TI process when sent
+type ProcessParameterExecute struct {
+	Name   string `json:"Name"`
+	Value  interface{}    `json:"Value"`
+}
+
 
 //DimensionsResponse
 type DimensionsResponse struct {
@@ -125,6 +129,12 @@ type Cellset struct {
 	Cells        []Cell `json:"Cells"`
 }
 
+//ProcessExecuteResult 
+type ProcessExecuteResult struct{
+
+}
+
+//Element
 type Element struct {
 	OdataContext string            `json:"@odata.context"`
 	OdataEtag    string            `json:"@odata.etag"`
@@ -339,7 +349,7 @@ func (s Tm1Session) Do(req *http.Request) ([]byte, error) {
 	return content, nil
 }
 
-//Tm1SendHttpRequest
+//Tm1SendHttpRequest wraps request creation and sending the requst over to tm1
 func (s *Tm1Session) Tm1SendHttpRequest(method, path string, body interface{}) ([]byte, error) {
 	req, err := s.NewRequest(method, path, body)
 	if err != nil {
@@ -368,6 +378,12 @@ type Session struct {
 type ThreadsResponse struct {
 	OdataContext string   `json:"@odata.context"`
 	Value        []Thread `json:"value"`
+}
+
+//ProcessesReponse
+type ProcessesReponse struct {
+	OdataContext string   `json:"@odata.context"`
+	Value        []Process `json:"value"`
 }
 
 //Thread
@@ -466,5 +482,39 @@ func (s Tm1Session) DimensionCreate(dim Dimension) error {
 		return err
 	}
 	return nil
+}
 
+
+func (s Tm1Session) GetProcesses() ([]Process, error) {
+
+	processes := ProcessesReponse{}
+	res,err:=s.Tm1SendHttpRequest("GET", "/Processes", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(res,&processes)
+
+	return processes.Value, nil
+}
+
+//ExecuteProcess runs a process in TM1
+func (s Tm1Session) ExecuteProcess(process Process) (ProcessExecuteResult, error) {
+	parameters:=[]ProcessParameterExecute{}
+
+	for _,v:=range process.Parameters{
+		parameters=append(parameters,ProcessParameterExecute{v.Name,v.Value})
+	}
+
+	result:=ProcessExecuteResult{}
+
+	p1, _ := json.Marshal(parameters)
+	payload := `{"Parameters":`+string(p1)+`}`
+	fmt.Println(payload)
+	res,err:=s.Tm1SendHttpRequest("POST", "/Processes('"+process.Name+"')/tm1.ExecuteWithReturn", payload)
+	if err != nil {
+		return result, err
+	}
+	json.Unmarshal(res,&result)
+	return result, nil
 }
