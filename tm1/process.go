@@ -2,13 +2,12 @@ package tm1
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
-//ProcessExecuteResult
-type ProcessExecuteResult struct{
+//ProcessExecuteResult describes result after a process finished execution
+type ProcessExecuteResult struct {
+	ProcessExecuteStatusCode string `json:ProcessExecuteStatusCode`
 }
-
 
 //ExecuteProcessResponse error response from executing process
 type ExecuteProcessResponse struct {
@@ -40,12 +39,12 @@ type Process struct {
 		DataSourceNameForServer string `json:"dataSourceNameForServer"`
 	} `json:"DataSource"`
 	Parameters []ProcessParameter `json:"Parameters"`
-	Variables []struct {
+	Variables  []struct {
 		Name      string `json:"Name"`
 		Type      string `json:"Type"`
 		Position  int    `json:"Position"`
 		StartByte int    `json:"StartByte"`
-		EndByte   int `json:"EndByte"`
+		EndByte   int    `json:"EndByte"`
 	} `json:"Variables"`
 	Attributes struct {
 		Caption string `json:"Caption"`
@@ -54,56 +53,54 @@ type Process struct {
 
 //ProcessParameter describes one parameter in a TI process when received
 type ProcessParameter struct {
-	Name   string `json:"Name"`
-	Prompt string `json:"Prompt"`
-	Value  interface{}    `json:"Value"`
-	Type   string `json:"Type"`
+	Name   string      `json:"Name"`
+	Prompt string      `json:"Prompt"`
+	Value  interface{} `json:"Value"`
+	Type   string      `json:"Type"`
 }
 
-//ProcessParameter describes one parameter in a TI process when sent
+//ProcessParameterExecute describes one parameter in a TI process when sent
 type ProcessParameterExecute struct {
-	Name   string `json:"Name"`
-	Value  interface{}    `json:"Value"`
+	Name  string      `json:"Name"`
+	Value interface{} `json:"Value"`
 }
 
-
-//ProcessesReponse
+//ProcessesReponse describes response from getProcesses method
 type ProcessesReponse struct {
-	OdataContext string   `json:"@odata.context"`
+	OdataContext string    `json:"@odata.context"`
 	Value        []Process `json:"value"`
 }
-
 
 func (s Tm1Session) GetProcesses() ([]Process, error) {
 
 	processes := ProcessesReponse{}
-	res,err:=s.Tm1SendHttpRequest("GET", "/Processes", nil)
+	res, err := s.Tm1SendHttpRequest("GET", "/Processes", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	json.Unmarshal(res,&processes)
+	json.Unmarshal(res, &processes)
 
 	return processes.Value, nil
 }
 
 //ExecuteProcess runs a process in TM1
 func (s Tm1Session) ExecuteProcess(process Process) (ProcessExecuteResult, error) {
-	parameters:=[]ProcessParameterExecute{}
+	parameters := []ProcessParameterExecute{}
 
-	for _,v:=range process.Parameters{
-		parameters=append(parameters,ProcessParameterExecute{v.Name,v.Value})
+	for _, v := range process.Parameters {
+		parameters = append(parameters, ProcessParameterExecute{v.Name, v.Value})
 	}
 
-	result:=ProcessExecuteResult{}
+	result := ProcessExecuteResult{}
 
 	p1, _ := json.Marshal(parameters)
-	payload := `{"Parameters":`+string(p1)+`}`
-	fmt.Println(payload)
-	res,err:=s.Tm1SendHttpRequest("POST", "/Processes('"+process.Name+"')/tm1.ExecuteWithReturn", payload)
+	payload := `{"Parameters":` + string(p1) + `}`
+
+	res, err := s.Tm1SendHttpRequest("POST", "/Processes('"+process.Name+"')/tm1.ExecuteWithReturn", payload)
 	if err != nil {
 		return result, err
 	}
-	json.Unmarshal(res,&result)
+	json.Unmarshal(res, &result)
 	return result, nil
 }

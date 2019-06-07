@@ -11,19 +11,19 @@ type SessionsResponse struct {
 	Value        []Session `json:value`
 }
 
-//Session
+//Session describes a tm1 session
 type Session struct {
 	ID      int    `json:"ID"`
 	Context string `json:"Context"`
 }
 
-//ThreadsResponse
+//ThreadsResponse response from threads request
 type ThreadsResponse struct {
 	OdataContext string   `json:"@odata.context"`
 	Value        []Thread `json:"value"`
 }
 
-//Thread
+//Thread describes a thread in tm1
 type Thread struct {
 	ID          int      `json:"ID"`
 	Type        string   `json:"Type"`
@@ -42,6 +42,7 @@ type Thread struct {
 	Session     *Session `json:"Session"`
 }
 
+//GetThreads gets all threads in tm1
 func (s Tm1Session) GetThreads() ([]Thread, error) {
 
 	threads := ThreadsResponse{}
@@ -67,8 +68,8 @@ func (t Thread) Cancel(s *Tm1Session) error {
 }
 
 //ThreadCancel cancels a thread (unbound)
-func (s Tm1Session) ThreadCancel(id string) error {
-	_, err := s.Tm1SendHttpRequest("POST", "/Threads('"+id+"')/tm1.CancelOperation", "{}")
+func (s Tm1Session) ThreadCancel(thread Thread) error {
+	_, err := s.Tm1SendHttpRequest("POST", "/Threads('"+string(thread.ID)+"')/tm1.CancelOperation", "{}")
 
 	if err != nil {
 

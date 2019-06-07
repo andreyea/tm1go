@@ -56,3 +56,54 @@ func (s Tm1Session) DimensionCreate(dim Dimension) error {
 	}
 	return nil
 }
+
+//GetDimensions gets all dimensions from tm1
+func (s Tm1Session) GetDimensions() ([]Dimension, error) {
+
+	dims := DimensionsResponse{}
+	res, err := s.Tm1SendHttpRequest("GET", "/Dimensions", nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(res, &dims)
+	return dims.Value, nil
+}
+
+//GetDimension brings a dimension from tm1
+func (s Tm1Session) GetDimension(dimName string) (Dimension, error) {
+
+	dim := Dimension{}
+	res, err := s.Tm1SendHttpRequest("GET", "/Dimensions('"+dimName+"')", nil)
+
+	if err != nil {
+		return dim, err
+	}
+
+	json.Unmarshal(res, &dim)
+	return dim, nil
+}
+
+//DimensionExists check if a cube exists in tm1
+func (s Tm1Session) DimensionExists(dimName string) (bool, error) {
+	_, err := s.GetDimension(dimName)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+//DimensionCreate creates local dimension struct
+func DimensionCreate(dName string) (Dimension, error) {
+	dim := Dimension{
+		Name: dName,
+		Hierarchies: []Hierarchy{
+			Hierarchy{
+				Name:     dName,
+				Elements: []Element{},
+			},
+		},
+	}
+	return dim, nil
+}
