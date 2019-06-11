@@ -1,6 +1,10 @@
 package tm1
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+)
 
 //Cube
 type Cube struct {
@@ -36,7 +40,7 @@ func (s Tm1Session) GetCubes() ([]Cube, error) {
 //GetCube method gets a cube from tm1
 func (s Tm1Session) GetCube(cubeName string) (Cube, error) {
 	cube := Cube{}
-	res, err := s.Tm1SendHttpRequest("GET", "/Cubes('"+cubeName+"')", nil)
+	res, err := s.Tm1SendHttpRequest("GET", "/Cubes('"+cubeName+"')?$expand=Dimensions($select=Name)", nil)
 	if err != nil {
 		return cube, err
 	}
@@ -106,4 +110,47 @@ func (s Tm1Session) CubeCreate(cube Cube) error {
 func CubeCreate(cubeName string) (Cube, error) {
 	cube := Cube{Name: cubeName}
 	return cube, nil
+}
+
+//CellPutN sends a value to tm1 cube
+func (s Tm1Session) CellPutN(value float64, cubeName string, elements ...string) error {
+
+	//get cube details
+	cube, err := s.GetCube(cubeName)
+	if err != nil {
+		return err
+	}
+
+	//check number of elements passed
+	if len(elements) != len(cube.Dimensions) {
+		return errors.New("Invalid number of elements provided. Expected: " + string(len(cube.Dimensions)) + ". Received: " + string(len(elements)))
+	}
+
+	//Loop through dimensions and create tuple
+	tuple := ""
+	for k, v := range cube.Dimensions {
+		if k == len(cube.Dimensions)-1 {
+			tuple = tuple + `"Dimensions('` + v.Name + `')/Hierarchies('` + v.Name + `')/Elements('` + elements[k] + `')"`
+		} else {
+			tuple = tuple + `"Dimensions('` + v.Name + `')/Hierarchies('` + v.Name + `')/Elements('` + elements[k] + `')",`
+		}
+
+	}
+
+	payload := `
+	{
+		"Cells":[
+		{"Tuple@odata.bind": [
+			` + tuple + `
+		]}],
+		"Value":"` + fmt.Sprintf("%f", value) + `"
+	}
+	`
+
+	_, err = s.Tm1SendHttpRequest("POST", "/Cubes('"+cubeName+"')/tm1.Update", payload)
+
+	if err != nil {
+		return err
+	}
+	return nil
 }

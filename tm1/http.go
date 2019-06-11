@@ -53,7 +53,7 @@ func (s Tm1Session) Do(req *http.Request) ([]byte, error) {
 	return content, nil
 }
 
-//Tm1SendHttpRequest wraps request creation and sending the requst over to tm1
+//Tm1SendHttpRequest combines NewRequest and Do functions
 func (s *Tm1Session) Tm1SendHttpRequest(method, path string, body interface{}) ([]byte, error) {
 	req, err := s.NewRequest(method, path, body)
 	if err != nil {
