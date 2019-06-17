@@ -154,3 +154,17 @@ func (s Tm1Session) CellPutN(value float64, cubeName string, elements ...string)
 	}
 	return nil
 }
+
+//ExecuteView returns cellset of a cube view
+func (s Tm1Session) ExecuteView(cubeName, viewName string) (cellset Cellset, err error) {
+
+	cont, err := s.Tm1SendHttpRequest("POST", "/Cubes('"+cubeName+"')/Views('"+viewName+"')/tm1.Execute?$expand=Axes($expand=Hierarchies,Tuples($expand=Members)),Cells,Cube($select=Name;$expand=Dimensions($select=Name))", "{}")
+	if err != nil {
+		return cellset, err
+	}
+	err = json.Unmarshal(cont, &cellset)
+	if err != nil {
+		return cellset, err
+	}
+	return cellset, nil
+}
