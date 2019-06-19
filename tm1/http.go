@@ -27,6 +27,8 @@ func (s Tm1Session) NewRequest(method, path string, body interface{}) (*http.Req
 	}
 	req.Header.Set("Accept", "application/json")
 
+	req.Header.Add("prefer", "odata.track-changes")
+
 	req.Header.Set("Authorization", s.token)
 
 	return req, nil

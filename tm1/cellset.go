@@ -45,6 +45,7 @@ type Tm1Matrix [][]Tm1MatrixCell
 type Tm1MatrixCell struct {
 	NValue float64
 	SValue string
+	BStr   bool
 }
 
 //CreateMatrix method converts a cellset to a two dimensional matrix
@@ -57,6 +58,7 @@ func (c Cellset) CreateMatrix() Tm1Matrix {
 
 		NValue := 0.0
 		SValue := ""
+		BStr := false
 		switch t := v.Value.(type) {
 		case float64:
 			NValue = t
@@ -64,6 +66,7 @@ func (c Cellset) CreateMatrix() Tm1Matrix {
 			NValue = float64(t)
 		case string:
 			SValue = string(t)
+			BStr = true
 		default:
 			return nil
 		}
@@ -72,7 +75,18 @@ func (c Cellset) CreateMatrix() Tm1Matrix {
 			matrix = append(matrix, row)
 			row = []Tm1MatrixCell{}
 		}
-		row = append(row, Tm1MatrixCell{NValue: NValue, SValue: SValue})
+		row = append(row, Tm1MatrixCell{NValue: NValue, SValue: SValue, BStr: BStr})
 	}
 	return matrix
+}
+
+//DestroyCellset deletes specified cellset in tm1
+func (s Tm1Session) DestroyCellset(cellsetID string) error {
+
+	_, err := s.Tm1SendHttpRequest("DELETE", "/Cellsets('"+cellsetID+"')", "{}")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
