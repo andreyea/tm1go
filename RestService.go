@@ -544,13 +544,16 @@ func (rs *RestService) startSession(
 		if err != nil {
 			return err
 		}
-		for key, value := range rs.headers {
-			req.Header.Add(key, value)
-		}
+
 		var token, _ = buildAuthorizationToken(rs.User, rs.Password, rs.Namespace, rs.Gateway, rs.CAMPassport, false)
 		req.Header.Add("Authorization", token)
 
 	}
+
+	for key, value := range rs.headers {
+		req.Header.Add(key, value)
+	}
+
 	rsp, err := rs.httpClient.Do(req)
 
 	if err != nil {
@@ -851,7 +854,7 @@ func buildAuthorizationToken(user, password, namespace, gateway, camPassport str
 func buildAuthorizationTokenCam(user, password, namespace, gateway string, verify bool) (string, error) {
 	if gateway != "" {
 		// not done yet
-		return "", nil
+		return "", fmt.Errorf("CAM SSO is not supported yet")
 	}
 
 	// Build the CAM token for Basic authentication
