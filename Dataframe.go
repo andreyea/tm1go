@@ -200,7 +200,6 @@ func (df *DataFrame) DeleteRow(index int) error {
 	return nil
 }
 
-// BuildMDX converts dataframes to MDX query
 func (df *DataFrame) ToMDX(cubeName string) (string, error) {
 	if len(df.Headers) < 3 { // Need at least one dimension column and one value column
 		return "", fmt.Errorf("dataFrame must contain at least 3 columns")
@@ -210,31 +209,33 @@ func (df *DataFrame) ToMDX(cubeName string) (string, error) {
 	uniformColumnIndices := df.FindUniformColumnIndices()
 
 	rowCount := df.RowCount()
-	axis := ""
-	whereSlice := make([]string, 0)
+	var axisBuilder strings.Builder
+
+	// Preallocate whereSlice with maximum possible size
+	maxWhereSize := rowCount * len(uniformColumnIndices)
+	whereSlice := make([]string, 0, maxWhereSize)
+
 	for i := 0; i < rowCount; i++ {
-
-		tuple := "("
-
+		axisBuilder.WriteString("(")
+		tuple := make([]string, 0, len(df.Headers)-1-len(uniformColumnIndices))
 		for j := 0; j < len(df.Headers)-1; j++ {
+			dim, hier := ExtractDimensionHierarchyFromString(df.Headers[j])
+			member := fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.Columns[df.Headers[j]][i])
+
 			// Check if the column is uniform
 			if SliceContains(uniformColumnIndices, j) {
-				dim, hier := ExtractDimensionHierarchyFromString(df.Headers[j])
-				whereSlice = append(whereSlice, fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.Columns[df.Headers[j]][i]))
+				whereSlice = append(whereSlice, member)
 			} else {
-				dim, hier := ExtractDimensionHierarchyFromString(df.Headers[j])
-				member := fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.Columns[df.Headers[j]][i])
-				tuple += member + ","
+				tuple = append(tuple, member)
 			}
 		}
-
-		tuple = strings.TrimRight(tuple, ",") + "),"
-		axis += tuple
+		axisBuilder.WriteString(strings.Join(tuple, ","))
+		axisBuilder.WriteString("),")
 	}
-	axis = "{" + strings.TrimRight(axis, ",") + "} ON 0"
+	axis := "{" + strings.TrimRight(axisBuilder.String(), ",") + "} ON 0"
 	whereString := ""
 	if len(whereSlice) > 0 {
-		whereSlice = UniqueStrings(whereSlice)
+		whereSlice = UniqueStrings(whereSlice) // This function should handle duplicates efficiently
 		whereString = " WHERE (" + strings.Join(whereSlice, ",") + ")"
 	}
 	// Construct the MDX query
