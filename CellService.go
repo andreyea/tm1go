@@ -364,8 +364,8 @@ func (cs *CellService) CellPut(params ...interface{}) error {
 }
 
 // ExtractCellsetCells extracts cells from a cellset
-func (cs *CellService) ExtractCellsetAxes(cellsetID string, sandboxName string) (*Cellset, error) {
-	url := fmt.Sprintf("/Cellsets('%s')?$expand=Axes($select=Ordinal,Cardinality;$expand=Hierarchies($select=Name;$expand=Dimension($select=Name)),Tuples($expand=Members($select=Name,UniqueName,Attributes,DisplayInfoAbove,DisplayInfo,Type)))", cellsetID)
+func (cs *CellService) ExtractCellsetAxesAndCube(cellsetID string, sandboxName string) (*Cellset, error) {
+	url := fmt.Sprintf("/Cellsets('%s')?$expand=Cube($select=Name),Axes($select=Ordinal,Cardinality;$expand=Hierarchies($select=Name,UniqueName;$expand=Dimension($select=Name)),Tuples($expand=Members($select=Name,UniqueName,Attributes,DisplayInfoAbove,DisplayInfo,Type)))", cellsetID)
 
 	if sandboxName != "" {
 		err := error(nil)
@@ -386,4 +386,56 @@ func (cs *CellService) ExtractCellsetAxes(cellsetID string, sandboxName string) 
 		return nil, err
 	}
 	return result, nil
+}
+
+// UpdateCellsetFromDataframe updates values inside a cellset using dataframe
+func (cs *CellService) UpdateCellsetFromDataframe(cubeName string, df *DataFrame, sandboxName string) error {
+
+	// Build mdx
+	mdx, err := df.ToMDX(cubeName)
+	if err != nil {
+		return err
+	}
+
+	cellsetID, err := cs.CreateCellSet(mdx, sandboxName)
+	if err != nil {
+		return err
+	}
+	defer cs.DeleteCellSet(cellsetID)
+
+	return cs.UpdateCellset(cellsetID, df.columns[df.headers[len(df.headers)-1]], sandboxName)
+}
+
+// ExecuteMdxToDataframe executes an MDX query and returns the result as a dataframe
+func (cs *CellService) ExecuteMdxToDataframe(mdx string, sandboxName string) (*DataFrame, error) {
+	cellsetID, err := cs.CreateCellSet(mdx, sandboxName)
+	if err != nil {
+		return nil, err
+	}
+	defer cs.DeleteCellSet(cellsetID)
+
+	cellsetMetadata, err := cs.ExtractCellsetAxesAndCube(cellsetID, sandboxName)
+	if err != nil {
+		return nil, err
+	}
+
+	cellsetCells, err := cs.ExtractCellsetCellsRaw(cellsetID, []string{"Value"}, 0, 0, false, false, false, sandboxName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	cellset := &Cellset{
+		ID:    cellsetID,
+		Cube:  cellsetMetadata.Cube,
+		Cells: cellsetCells,
+		Axes:  cellsetMetadata.Axes,
+	}
+
+	df, err := CellSetToDataFrame(cellset)
+	if err != nil {
+		return nil, err
+	}
+
+	return df, nil
 }

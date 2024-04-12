@@ -95,11 +95,65 @@ func AddURLParameters(baseURL string, params map[string]string) (string, error) 
 	return u.String(), nil
 }
 
-func SliceContains(slice []string, item string) bool {
-	for _, a := range slice {
-		if a == item {
+// SliceContains checks if a slice contains a value. It uses generics to work with any comparable type.
+func SliceContains[T comparable](slice []T, value T) bool {
+	for _, v := range slice {
+		if v == value {
 			return true
 		}
 	}
 	return false
+}
+
+// UniqueStrings returns a slice of unique strings from the input slice
+func UniqueStrings(input []string) []string {
+	unique := make(map[string]bool)
+	var result []string
+	for _, item := range input {
+		if _, value := unique[item]; !value {
+			unique[item] = true
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// ExtractDimensionHierarchyFromString extracts the dimension and hierarchy from a string in the format [dimension].[hierarchy] or dimension:hierarchy
+func ExtractDimensionHierarchyFromString(input string) (string, string) {
+	var sections []string
+	start := -1
+
+	// Iterate over the string to find brackets and dot separators
+	for i, char := range input {
+		switch char {
+		case '[':
+			if start == -1 { // Ensure no nested brackets
+				start = i + 1 // Mark the start after the '['
+			}
+		case ']':
+			if start != -1 && i > start { // Ensure there's a valid '[' before ']'
+				sections = append(sections, input[start:i])
+				start = -1 // Reset start index after adding to sections
+			}
+		case '.':
+			if start != -1 { // If '.' found within brackets, it's not a valid format
+				return input, input
+			}
+		}
+	}
+
+	// Check if the format exactly matches [text].[text]
+	if len(sections) == 2 {
+		return sections[0], sections[1]
+	} else if len(sections) == 0 && strings.Contains(input, ":") {
+		// If no brackets found but input contains ":", split by ":"
+		parts := strings.SplitN(input, ":", 2)
+		if len(parts) == 2 {
+			return parts[0], parts[1]
+		}
+		return parts[0], "" // In case there is nothing after the colon
+	}
+
+	// If not matching or partially matching, return the original input twice
+	return input, input
 }
