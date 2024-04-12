@@ -403,7 +403,7 @@ func (cs *CellService) UpdateCellsetFromDataframe(cubeName string, df *DataFrame
 	}
 	defer cs.DeleteCellSet(cellsetID)
 
-	return cs.UpdateCellset(cellsetID, df.columns[df.headers[len(df.headers)-1]], sandboxName)
+	return cs.UpdateCellset(cellsetID, df.Columns[df.Headers[len(df.Headers)-1]], sandboxName)
 }
 
 // ExecuteMdxToDataframe executes an MDX query and returns the result as a dataframe

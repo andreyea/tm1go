@@ -10,35 +10,35 @@ import (
 )
 
 type DataFrame struct {
-	columns map[string][]interface{}
-	headers []string
+	Columns map[string][]interface{}
+	Headers []string
 }
 
 func NewDataFrame(columns []string) *DataFrame {
 	df := &DataFrame{
-		columns: make(map[string][]interface{}),
-		headers: columns,
+		Columns: make(map[string][]interface{}),
+		Headers: columns,
 	}
 	for _, col := range columns {
-		df.columns[col] = make([]interface{}, 0)
+		df.Columns[col] = make([]interface{}, 0)
 	}
 	return df
 }
 
 func (df *DataFrame) AddRow(row []interface{}) error {
-	if len(row) != len(df.headers) {
+	if len(row) != len(df.Headers) {
 		return fmt.Errorf("the number of values in the row does not match the number of columns")
 	}
 	for i, value := range row {
-		colName := df.headers[i]
-		df.columns[colName] = append(df.columns[colName], value)
+		colName := df.Headers[i]
+		df.Columns[colName] = append(df.Columns[colName], value)
 	}
 	return nil
 }
 
 // SortByColumns sorts the DataFrame based on the specified columns
 func (df *DataFrame) SortByColumns(columnNames []string) error {
-	indices := make([]int, len(df.columns[df.headers[0]]))
+	indices := make([]int, len(df.Columns[df.Headers[0]]))
 	for i := range indices {
 		indices[i] = i
 	}
@@ -46,7 +46,7 @@ func (df *DataFrame) SortByColumns(columnNames []string) error {
 	// Reverse iterate over the columnNames to ensure the primary sort key takes precedence
 	for i := len(columnNames) - 1; i >= 0; i-- {
 		columnName := columnNames[i]
-		column, ok := df.columns[columnName]
+		column, ok := df.Columns[columnName]
 		if !ok {
 			return fmt.Errorf("column %s does not exist", columnName)
 		}
@@ -68,14 +68,14 @@ func (df *DataFrame) SortByColumns(columnNames []string) error {
 
 	// Reorder the columns based on sorted indices.
 	sortedColumns := make(map[string][]interface{})
-	for _, header := range df.headers {
+	for _, header := range df.Headers {
 		sortedColumns[header] = make([]interface{}, len(indices))
 		for newIndex, oldIndex := range indices {
-			sortedColumns[header][newIndex] = df.columns[header][oldIndex]
+			sortedColumns[header][newIndex] = df.Columns[header][oldIndex]
 		}
 	}
 
-	df.columns = sortedColumns
+	df.Columns = sortedColumns
 
 	return nil
 }
@@ -83,7 +83,7 @@ func (df *DataFrame) SortByColumns(columnNames []string) error {
 // SortByColumn sorts the DataFrame based on the specified column
 func (df *DataFrame) SortByColumn(columnName string) error {
 	// Retrieve the column to sort by.
-	column, ok := df.columns[columnName]
+	column, ok := df.Columns[columnName]
 	if !ok {
 		return fmt.Errorf("column %s does not exist", columnName)
 	}
@@ -108,14 +108,14 @@ func (df *DataFrame) SortByColumn(columnName string) error {
 
 	// Create a new map to hold the sorted columns
 	sortedColumns := make(map[string][]interface{})
-	for _, header := range df.headers {
+	for _, header := range df.Headers {
 		sortedColumns[header] = make([]interface{}, len(column))
 		for newIndex, oldIndex := range indices {
-			sortedColumns[header][newIndex] = df.columns[header][oldIndex]
+			sortedColumns[header][newIndex] = df.Columns[header][oldIndex]
 		}
 	}
 
-	df.columns = sortedColumns
+	df.Columns = sortedColumns
 
 	return nil
 }
@@ -132,17 +132,17 @@ func (df *DataFrame) ExportToCSV(filename string) error {
 	defer writer.Flush()
 
 	// Write the headers (column names) as the first row
-	if err := writer.Write(df.headers); err != nil {
+	if err := writer.Write(df.Headers); err != nil {
 		return fmt.Errorf("error writing headers to CSV: %w", err)
 	}
 
 	// Iterate over the rows and write each one
-	numRows := len(df.columns[df.headers[0]])
+	numRows := len(df.Columns[df.Headers[0]])
 	for i := 0; i < numRows; i++ {
-		row := make([]string, len(df.headers))
-		for j, header := range df.headers {
+		row := make([]string, len(df.Headers))
+		for j, header := range df.Headers {
 			// Convert each value to string
-			row[j] = fmt.Sprintf("%v", df.columns[header][i])
+			row[j] = fmt.Sprintf("%v", df.Columns[header][i])
 		}
 		if err := writer.Write(row); err != nil {
 			return fmt.Errorf("error writing row to CSV: %w", err)
@@ -157,30 +157,30 @@ func (df *DataFrame) ExportToCSV(filename string) error {
 // it returns an error without adding the column.
 func (df *DataFrame) AddColumn(name string, values []interface{}) error {
 	// Check if the column already exists
-	if _, exists := df.columns[name]; exists {
+	if _, exists := df.Columns[name]; exists {
 		return fmt.Errorf("column %s already exists", name)
 	}
 
 	// Ensure the new column has the correct number of rows
-	expectedRows := len(df.columns[df.headers[0]])
+	expectedRows := len(df.Columns[df.Headers[0]])
 	if len(values) != expectedRows {
 		return fmt.Errorf("expected %d values, got %d", expectedRows, len(values))
 	}
 
 	// Add the new column
-	df.columns[name] = values
-	df.headers = append(df.headers, name)
+	df.Columns[name] = values
+	df.Headers = append(df.Headers, name)
 
 	return nil
 }
 
 // RowCount returns the number of rows in the DataFrame.
 func (df *DataFrame) RowCount() int {
-	if len(df.headers) == 0 {
+	if len(df.Headers) == 0 {
 		return 0 // No columns, hence no rows
 	}
-	firstColumnName := df.headers[0]
-	return len(df.columns[firstColumnName])
+	firstColumnName := df.Headers[0]
+	return len(df.Columns[firstColumnName])
 }
 
 // DeleteRow deletes the row at the specified index from the DataFrame
@@ -193,8 +193,8 @@ func (df *DataFrame) DeleteRow(index int) error {
 	}
 
 	// Delete the row from each column
-	for _, col := range df.headers {
-		df.columns[col] = append(df.columns[col][:index], df.columns[col][index+1:]...)
+	for _, col := range df.Headers {
+		df.Columns[col] = append(df.Columns[col][:index], df.Columns[col][index+1:]...)
 	}
 
 	return nil
@@ -202,7 +202,7 @@ func (df *DataFrame) DeleteRow(index int) error {
 
 // BuildMDX converts dataframes to MDX query
 func (df *DataFrame) ToMDX(cubeName string) (string, error) {
-	if len(df.headers) < 3 { // Need at least one dimension column and one value column
+	if len(df.Headers) < 3 { // Need at least one dimension column and one value column
 		return "", fmt.Errorf("dataFrame must contain at least 3 columns")
 	}
 
@@ -216,14 +216,14 @@ func (df *DataFrame) ToMDX(cubeName string) (string, error) {
 
 		tuple := "("
 
-		for j := 0; j < len(df.headers)-1; j++ {
+		for j := 0; j < len(df.Headers)-1; j++ {
 			// Check if the column is uniform
 			if SliceContains(uniformColumnIndices, j) {
-				dim, hier := ExtractDimensionHierarchyFromString(df.headers[j])
-				whereSlice = append(whereSlice, fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.columns[df.headers[j]][i]))
+				dim, hier := ExtractDimensionHierarchyFromString(df.Headers[j])
+				whereSlice = append(whereSlice, fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.Columns[df.Headers[j]][i]))
 			} else {
-				dim, hier := ExtractDimensionHierarchyFromString(df.headers[j])
-				member := fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.columns[df.headers[j]][i])
+				dim, hier := ExtractDimensionHierarchyFromString(df.Headers[j])
+				member := fmt.Sprintf("[%s].[%s].[%v]", dim, hier, df.Columns[df.Headers[j]][i])
 				tuple += member + ","
 			}
 		}
@@ -245,14 +245,14 @@ func (df *DataFrame) ToMDX(cubeName string) (string, error) {
 // FindUniformColumnIndicesParallel finds indices of uniform columns using multiple Go routines
 func (df *DataFrame) FindUniformColumnIndicesParallel() []int {
 	var wg sync.WaitGroup
-	uniformColumnIndicesChan := make(chan int, len(df.headers))
+	uniformColumnIndicesChan := make(chan int, len(df.Headers))
 
-	for idx, colName := range df.headers {
+	for idx, colName := range df.Headers {
 		wg.Add(1)
 		// Launch a Go routine for each column
 		go func(idx int, colName string) {
 			defer wg.Done()
-			column := df.columns[colName]
+			column := df.Columns[colName]
 			isUniform := true
 
 			if len(column) > 1 {
@@ -287,10 +287,10 @@ func (df *DataFrame) FindUniformColumnIndicesParallel() []int {
 
 // FindUniformColumnIndices searches for uniform columns
 func (df *DataFrame) FindUniformColumnIndices() []int {
-	uniformColumnIndices := make([]int, 0, len(df.headers)) // Allocate with expected capacity to minimize reallocations
+	uniformColumnIndices := make([]int, 0, len(df.Headers)) // Allocate with expected capacity to minimize reallocations
 
-	for idx, colName := range df.headers {
-		column := df.columns[colName]
+	for idx, colName := range df.Headers {
+		column := df.Columns[colName]
 		isUniform := true
 
 		// Directly include columns with 0 or 1 values as uniform
