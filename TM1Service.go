@@ -1,5 +1,10 @@
 package tm1go
 
+import (
+	"encoding/json"
+	"os"
+)
+
 // TM1Service is a service for interacting with TM1
 type TM1Service struct {
 	restClient           *RestService
@@ -20,46 +25,70 @@ type TM1Service struct {
 
 // TM1ServiceConfig is a configuration for TM1Service
 type TM1ServiceConfig struct {
-	Address                   string            // The address of the target server or service
-	Port                      int               // The HTTP port number for communication
-	SSL                       bool              // Indicates whether SSL/TLS encryption is enabled
-	Instance                  string            // The name of the specific instance or system
-	Database                  string            // The name of the database or data source
-	BaseURL                   string            // The base URL for API endpoints
-	AuthURL                   string            // The URL for authentication services
-	User                      string            // The username or user identifier
-	Password                  string            // The user's password
-	DecodeB64                 bool              // Specifies if the password is base64 encoded
-	Namespace                 string            // An optional namespace for access control
-	CAMPassport               string            // The CAM (Cognos Access Manager) passport
-	SessionID                 map[string]string // The unique session identifier
-	ApplicationClientID       string            // The client ID for application integration
-	ApplicationClientSecret   string            // The client secret for application integration
-	APIKey                    string            // The API Key for authentication
-	IAMURL                    string            // The IBM Cloud IAM (Identity and Access Management) URL
-	PAURL                     string            // The URL for the Planning Analytics Engine
-	Tenant                    string            // The tenant identifier
-	SessionContext            string            // The name of the application context
-	Verify                    bool              //
-	VerifyCertPath            string            // The path to a certificate file for verification
-	Logging                   bool              // Specifies whether verbose HTTP logging is enabled
-	Timeout                   float64           // The maximum time to wait for the first byte in seconds
-	CancelAtTimeout           bool              // Indicates whether operations should be aborted on timeout
-	AsyncRequestsMode         bool              // Enables a mode to avoid 60s timeouts on IBM Cloud
-	TCPKeepAlive              bool              // Maintains the TCP connection continuously
-	ConnectionPoolSize        int               // Size of the connection pool in a multi-threaded environment
-	IntegratedLogin           bool              // Enables IntegratedSecurityMode3
-	IntegratedLoginDomain     string            // The NT Domain name for integrated login
-	IntegratedLoginService    string            // The Kerberos Service type for remote Service Principal Name
-	IntegratedLoginHost       string            // The host name for Service Principal Name
-	IntegratedLoginDelegate   bool              // Indicates whether user credentials are delegated to the server
-	Impersonate               string            // The name of the user to impersonate
-	ReconnectOnSessionTimeout bool              // Attempts to reconnect once if the session times out
-	Proxies                   map[string]string // A dictionary of proxy settings
-	Gateway                   string
-	Headers                   map[string]string
-	Session                   interface{}
-	//httpClient                *http.Client
+	Address                   string            `json:"Address,omitempty"`                   // The address of the target server or service
+	Port                      int               `json:"Port,omitempty"`                      // The HTTP port number for communication
+	SSL                       bool              `json:"SS,omitempty"`                        // Indicates whether SSL/TLS encryption is enabled
+	Instance                  string            `json:"Instance,omitempty"`                  // The name of the specific instance or system
+	Database                  string            `json:"Database,omitempty"`                  // The name of the database or data source
+	BaseURL                   string            `json:"BaseURL,omitempty"`                   // The base URL for API endpoints
+	AuthURL                   string            `json:"AuthURL,omitempty"`                   // The URL for authentication services
+	User                      string            `json:"User,omitempty"`                      // The username or user identifier
+	Password                  string            `json:"Password,omitempty"`                  // The user's password
+	DecodeB64                 bool              `json:"DecodeB64,omitempty"`                 // Specifies if the password is base64 encoded
+	Namespace                 string            `json:"Namespace,omitempty"`                 // An optional namespace for access control
+	CAMPassport               string            `json:"CAMPassport,omitempty"`               // The CAM (Cognos Access Manager) passport
+	SessionID                 map[string]string `json:"SessionID,omitempty"`                 // The unique session identifier
+	ApplicationClientID       string            `json:"ApplicationClientID,omitempty"`       // The client ID for application integration
+	ApplicationClientSecret   string            `json:"ApplicationClientSecret,omitempty"`   // The client secret for application integration
+	APIKey                    string            `json:"APIKey,omitempty"`                    // The API Key for authentication
+	IAMURL                    string            `json:"IAMURL,omitempty"`                    // The IBM Cloud IAM (Identity and Access Management) URL
+	PAURL                     string            `json:"PAURL,omitempty"`                     // The URL for the Planning Analytics Engine
+	Tenant                    string            `json:"Tenant,omitempty"`                    // The tenant identifier
+	SessionContext            string            `json:"SessionContext,omitempty"`            // The name of the application context
+	Verify                    bool              `json:"Verify,omitempty"`                    //
+	VerifyCertPath            string            `json:"VerifyCertPath,omitempty"`            // The path to a certificate file for verification
+	Logging                   bool              `json:"Logging,omitempty"`                   // Specifies whether verbose HTTP logging is enabled
+	Timeout                   float64           `json:"Timeout,omitempty"`                   // The maximum time to wait for the first byte in seconds
+	CancelAtTimeout           bool              `json:"CancelAtTimeout,omitempty"`           // Indicates whether operations should be aborted on timeout
+	AsyncRequestsMode         bool              `json:"AsyncRequestsMode,omitempty"`         // Enables a mode to avoid 60s timeouts on IBM Cloud
+	TCPKeepAlive              bool              `json:"TCPKeepAlive,omitempty"`              // Maintains the TCP connection continuously
+	ConnectionPoolSize        int               `json:"ConnectionPoolSize,omitempty"`        // Size of the connection pool in a multi-threaded environment
+	IntegratedLogin           bool              `json:"IntegratedLogin,omitempty"`           // Enables IntegratedSecurityMode3
+	IntegratedLoginDomain     string            `json:"IntegratedLoginDomain,omitempty"`     // The NT Domain name for integrated login
+	IntegratedLoginService    string            `json:"IntegratedLoginService,omitempty"`    // The Kerberos Service type for remote Service Principal Name
+	IntegratedLoginHost       string            `json:"IntegratedLoginHost,omitempty"`       // The host name for Service Principal Name
+	IntegratedLoginDelegate   bool              `json:"IntegratedLoginDelegate,omitempty"`   // Indicates whether user credentials are delegated to the server
+	Impersonate               string            `json:"Impersonate,omitempty"`               // The name of the user to impersonate
+	ReconnectOnSessionTimeout bool              `json:"ReconnectOnSessionTimeout,omitempty"` // Attempts to reconnect once if the session times out
+	Proxies                   map[string]string `json:"Proxies,omitempty"`                   // A dictionary of proxy settings
+	Gateway                   string            `json:"Gateway,omitempty"`
+	Headers                   map[string]string `json:"Headers,omitempty"`
+	Session                   interface{}       `json:"Session,omitempty"`
+}
+
+// Save saves the TM1ServiceConfig to a file
+func (c *TM1ServiceConfig) Save(filePath string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(c)
+}
+
+// Load loads the TM1ServiceConfig from a file
+func (c *TM1ServiceConfig) Load(filePath string) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	return decoder.Decode(c)
 }
 
 // NewTM1Service creates a new TM1Service instance
