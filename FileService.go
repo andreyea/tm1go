@@ -1,6 +1,8 @@
 package tm1go
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -109,15 +111,7 @@ func (fs *FileService) Create(fileName string, contentPath []string, file []byte
 		return err
 	}
 
-	url += "('" + fileName + "')/Content"
-
-	headers := map[string]string{
-		"Content-Type": "application/octet-stream",
-	}
-
-	_, err = fs.rest.PATCH(url, string(file), headers, 0, nil)
-
-	return err
+	return fs.Update(fileName, contentPath, file)
 }
 
 // Update a file
@@ -148,6 +142,49 @@ func (fs *FileService) Update(fileName string, contentPath []string, file []byte
 	}
 
 	_, err = fs.rest.PATCH(url, string(file), headers, 0, nil)
+
+	return err
+}
+
+// UpdateCompressed compresses file content and updates a file
+// If contentPath is empty, the file will be updated in the root folder
+func (fs *FileService) UpdateCompressed(fileName string, contentPath []string, file []byte) error {
+
+	url := "/Contents('" + fs.getVersionContentPath() + "')"
+
+	for _, path := range contentPath {
+		url += "/Contents('" + path + "')"
+	}
+
+	url += "/Contents('" + fileName + "')/Content"
+
+	// check if exists
+	exists, err := fs.object.Exists(url)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		filePath := strings.Join(contentPath, "/")
+		filePath += "/" + fileName
+		return fmt.Errorf("file %s does not exist", filePath)
+	}
+
+	// Compress the file data using gzip
+	var compressedData bytes.Buffer
+	gz := gzip.NewWriter(&compressedData)
+	if _, err := gz.Write(file); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+
+	headers := map[string]string{
+		"Content-Type":     "application/octet-stream",
+		"Content-Encoding": "gzip",
+	}
+
+	_, err = fs.rest.PATCH(url, compressedData.String(), headers, 0, nil)
 
 	return err
 }
@@ -210,6 +247,34 @@ func (fs *FileService) Delete(fileName string, contentPath []string) error {
 	return err
 }
 
-//get_all_directories_names
-//get_all_files_names
-//search_string_in_name
+// Create compresses file content and creates a new file entity
+func (fs *FileService) CreateCompressed(fileName string, contentPath []string, file []byte) error {
+	url := "/Contents('" + fs.getVersionContentPath() + "')"
+
+	for _, path := range contentPath {
+		url += "/Contents('" + path + "')"
+	}
+
+	url += "/Contents"
+
+	body := map[string]interface{}{
+		"@odata.type": "#ibm.tm1.api.v1.Document",
+		"ID":          fileName,
+		"Name":        fileName,
+	}
+
+	bodyJson, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	_, err = fs.rest.POST(url, string(bodyJson), nil, 0, nil)
+	if err != nil {
+		return err
+	}
+
+	url += "('" + fileName + "')/Content"
+
+	return fs.UpdateCompressed(fileName, contentPath, file)
+
+}
