@@ -70,7 +70,11 @@ func (fs *FileService) Get(fileName string, contentPath []string) ([]byte, error
 
 	url += "/Contents('" + fileName + "')/Content"
 
-	response, err := fs.rest.GET(url, nil, 0, nil)
+	headers := map[string]string{
+		"Accept-Encoding": "gzip, deflate",
+	}
+
+	response, err := fs.rest.GET(url, headers, 0, nil)
 	if err != nil {
 		return nil, err
 	}
