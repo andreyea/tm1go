@@ -211,7 +211,7 @@ func (ps *ProcessService) Execute(processName string, parameters map[string]inte
 }
 
 // Execute unboud process
-func (ps *ProcessService) ExecuteProcessWithReturn(process Process, parameters map[string]interface{}, timeout time.Duration) (*ProcessExecuteResult, error) {
+func (ps *ProcessService) ExecuteProcessWithReturn(process *Process, parameters map[string]interface{}, timeout time.Duration) (*ProcessExecuteResult, error) {
 	url := "/ExecuteProcessWithReturn?$expand=*"
 	for parameterName, parameterValue := range parameters {
 		p := process.GetParameter(parameterName)
@@ -278,7 +278,7 @@ func (ps *ProcessService) ExecuteTICode(prologCode string, epilogCode string) (*
 	process := NewProcess(processName)
 	process.PrologProcedure = prologCode
 	process.EpilogProcedure = epilogCode
-	result, err := ps.ExecuteProcessWithReturn(*process, nil, 0)
+	result, err := ps.ExecuteProcessWithReturn(process, nil, 0)
 	if err != nil {
 		return nil, err
 	}

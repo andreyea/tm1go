@@ -109,8 +109,8 @@ func NewTM1Service(config TM1ServiceConfig) *TM1Service {
 	tm1Service.DimensionService = NewDimensionService(tm1Service.restClient, tm1Service.ObjectService, tm1Service.HierarchyService)
 	tm1Service.SubsetService = NewSubsetService(tm1Service.restClient)
 	tm1Service.ProcessService = NewProcessService(tm1Service.restClient, tm1Service.ObjectService)
-	tm1Service.CellService = NewCellService(tm1Service.restClient, tm1Service.CubeService)
 	tm1Service.FileService = NewFileService(tm1Service.restClient, tm1Service.ObjectService)
+	tm1Service.CellService = NewCellService(tm1Service.restClient, tm1Service.CubeService, tm1Service.FileService, tm1Service.ProcessService)
 	tm1Service.SandboxService = NewSandboxService(tm1Service.restClient)
 	tm1Service.ViewService = NewViewService(tm1Service.restClient, tm1Service.ObjectService)
 

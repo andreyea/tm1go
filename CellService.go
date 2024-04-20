@@ -4,19 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 	"sync"
 )
 
 // Service for reading and writing TM1 cube cells
 type CellService struct {
-	rest *RestService
-	cube *CubeService
+	rest    *RestService
+	cube    *CubeService
+	file    *FileService
+	process *ProcessService
 }
 
 // NewCellService creates a new cell service
-func NewCellService(rest *RestService, cube *CubeService) *CellService {
-	return &CellService{rest: rest, cube: cube}
+func NewCellService(rest *RestService, cube *CubeService, file *FileService, process *ProcessService) *CellService {
+	return &CellService{rest: rest, cube: cube, file: file, process: process}
 }
 
 // CreateCellSet creates a cellset
@@ -438,4 +441,96 @@ func (cs *CellService) ExecuteMdxToDataframe(mdx string, sandboxName string) (*D
 	}
 
 	return df, nil
+}
+
+// Read via blob
+func (cs *CellService) ExecuteMDXViaBlob(mdx string, sandboxName string) (*DataFrame, error) {
+	// create temp mdx view
+
+	// create unboud process and asciioutput data from the view into a file (csv)
+
+	// get the file using file service
+
+	// process csv file into dataframe
+
+	// cleanup temp view and file
+
+	// return dataframe
+
+	return &DataFrame{}, nil
+}
+
+// UpdateCellsetFromDataframeViaBlob Writes data to a cube via blob. Numeric valus only.
+func (cs *CellService) UpdateCellsetFromDataframeViaBlob(cubeName string, df *DataFrame, sandboxName string) error {
+	// Convert dataframe into csv file
+	dataBytes, err := df.ConvertToCSVBytes()
+	if err != nil {
+		return err
+	}
+
+	// Upload file to tm1 using file service
+	randomNumber := 10000 + rand.Intn(90000)
+	randomName := fmt.Sprintf("tm1go_dataload_temp_%d.csv", randomNumber)
+	err = cs.file.CreateCompressed(randomName, nil, dataBytes)
+	if err != nil {
+		return err
+	}
+
+	// Create unboud process and use the file as a source to load data into cube
+	process := NewProcess(randomName)
+
+	process.DataSource.Type = "ASCII"
+	process.DataSource.AsciiDecimalSeparator = "."
+	process.DataSource.AsciiDelimiterChar = ","
+	process.DataSource.AsciiDelimiterType = "Character"
+	process.DataSource.AsciiHeaderRecords = 1
+	process.DataSource.AsciiQuoteCharacter = "\""
+	process.DataSource.AsciiThousandSeparator = ","
+	process.DataSource.DataSourceNameForClient = randomName
+	process.DataSource.DataSourceNameForServer = randomName
+
+	process.Variables = make([]ProcessVariable, len(df.Headers))
+
+	// Add dimension variables
+	for i := 0; i < len(df.Headers)-1; i++ {
+		process.Variables[i] = ProcessVariable{
+			Name:      fmt.Sprintf("v%d", i+1),
+			Type:      "String",
+			StartByte: 0,
+			EndByte:   0,
+			Position:  i + 1,
+		}
+	}
+
+	// Add last value variable
+	valueVariable := fmt.Sprintf("v%d", len(df.Headers))
+	process.Variables[len(df.Headers)-1] = ProcessVariable{
+		Name:      valueVariable,
+		Type:      "Numeric",
+		StartByte: 0,
+		EndByte:   0,
+		Position:  len(df.Headers),
+	}
+
+	// Add process script
+	scriptString := "CellPutN(" + valueVariable + ",'" + cubeName + "',"
+	for i := 0; i < len(df.Headers)-1; i++ {
+		scriptString += "v" + fmt.Sprintf("%d", i+1) + ","
+	}
+	scriptString = scriptString[:len(scriptString)-1]
+	scriptString += ");"
+
+	process.DataProcedure = scriptString
+	_, err = cs.process.ExecuteProcessWithReturn(process, nil, 0)
+	if err != nil {
+		return err
+	}
+
+	// Cleanup: delete file
+	err = cs.file.Delete(randomName, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

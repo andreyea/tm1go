@@ -1,6 +1,7 @@
 package tm1go
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -150,6 +151,43 @@ func (df *DataFrame) ExportToCSV(filename string) error {
 	}
 
 	return nil
+}
+
+// ExportToCSV exports the DataFrame to a CSV and returns it as []byte
+func (df *DataFrame) ConvertToCSVBytes() ([]byte, error) {
+	// Estimate the buffer size (optional, for performance tweak)
+	estimatedSize := len(df.Headers) * 10 * len(df.Columns[df.Headers[0]])
+	var buf bytes.Buffer
+	buf.Grow(estimatedSize)
+
+	writer := csv.NewWriter(&buf)
+
+	// Write the headers (column names) as the first row
+	if err := writer.Write(df.Headers); err != nil {
+		return nil, fmt.Errorf("error writing headers to CSV: %w", err)
+	}
+
+	// Iterate over the rows and write each one
+	numRows := len(df.Columns[df.Headers[0]])
+	for i := 0; i < numRows; i++ {
+		row := make([]string, len(df.Headers))
+		for j, header := range df.Headers {
+			value := df.Columns[header][i]
+			// Convert each value to string
+			row[j] = fmt.Sprintf("%v", value)
+		}
+		if err := writer.Write(row); err != nil {
+			return nil, fmt.Errorf("error writing row to CSV: %w", err)
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("error flushing CSV writer: %w", err)
+	}
+
+	// Return the bytes of the CSV data
+	return buf.Bytes(), nil
 }
 
 // AddColumn adds a new column to the DataFrame with the provided name and values.
@@ -354,6 +392,48 @@ func CellSetToDataFrame(cellset *Cellset) (*DataFrame, error) {
 		}
 
 		row = append(row, cell.Value)
+		err := df.AddRow(row)
+		if err != nil {
+			return nil, fmt.Errorf("error adding row %d to dataframe: %w", i, err)
+		}
+	}
+
+	return df, nil
+}
+
+// Clear data frame
+func (df *DataFrame) ClearData() {
+	for _, col := range df.Headers {
+		df.Columns[col] = make([]interface{}, 0)
+	}
+}
+
+// NewDataFromCSV creates new dataframe from CSV file
+func NewDataFromCSV(filename string) (*DataFrame, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %w", err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV file: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no records found in CSV file")
+	}
+
+	headers := records[0]
+	df := NewDataFrame(headers)
+
+	for i := 1; i < len(records); i++ {
+		row := make([]interface{}, len(records[i]))
+		for j, value := range records[i] {
+			row[j] = value
+		}
 		err := df.AddRow(row)
 		if err != nil {
 			return nil, fmt.Errorf("error adding row %d to dataframe: %w", i, err)

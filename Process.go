@@ -70,8 +70,8 @@ type ProcessDataSource struct {
 	Type                    string `json:"Type,omitempty"`
 	AsciiDecimalSeparator   string `json:"asciiDecimalSeparator,omitempty"`
 	AsciiDelimiterChar      string `json:"asciiDelimiterChar,omitempty"`
-	AsciiDelimiterType      string `json:"asciiDelimiterType,omitempty"`
-	AsciiHeaderRecords      string `json:"asciiHeaderRecords,omitempty"`
+	AsciiDelimiterType      string `json:"asciiDelimiterType,omitempty"` // "Character" or "FixedWidth"
+	AsciiHeaderRecords      int    `json:"asciiHeaderRecords,omitempty"`
 	AsciiQuoteCharacter     string `json:"asciiQuoteCharacter,omitempty"`
 	AsciiThousandSeparator  string `json:"asciiThousandSeparator,omitempty"`
 	DataSourceNameForClient string `json:"dataSourceNameForClient,omitempty"`
@@ -85,8 +85,8 @@ type ProcessDataSource struct {
 }
 
 type ProcessVariable struct {
-	Name      string `json:"Name,omitempty"`      // The name of the process variable, cannot be null.
-	Type      string `json:"Type,omitempty"`      // The type of the process variable, cannot be null.
+	Name      string `json:"Name"`                // The name of the process variable, cannot be null.
+	Type      string `json:"Type"`                // The type of the process variable, cannot be null.
 	Position  int    `json:"Position,omitempty"`  // The position of the variable in the data source.
 	StartByte int    `json:"StartByte,omitempty"` // The starting byte position of the variable in the data source.
 	EndByte   int    `json:"EndByte,omitempty"`   // The ending byte position of the variable in the data source.
