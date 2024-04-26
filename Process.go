@@ -7,6 +7,65 @@ import (
 	"time"
 )
 
+// ProcessExecuteStatusCode is the custom type for the enum.
+type ProcessExecuteStatusCode int
+
+const (
+	// Enum values with their corresponding integer representations.
+	CompletedSuccessfully ProcessExecuteStatusCode = iota
+	Aborted
+	HasMinorErrors
+	QuitCalled
+	CompletedWithMessages
+	RollbackCalled
+)
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (p *ProcessExecuteStatusCode) UnmarshalJSON(data []byte) error {
+	var status string
+	if err := json.Unmarshal(data, &status); err != nil {
+		return err
+	}
+
+	switch status {
+	case "CompletedSuccessfully":
+		*p = CompletedSuccessfully
+	case "Aborted":
+		*p = Aborted
+	case "HasMinorErrors":
+		*p = HasMinorErrors
+	case "QuitCalled":
+		*p = QuitCalled
+	case "CompletedWithMessages":
+		*p = CompletedWithMessages
+	case "RollbackCalled":
+		*p = RollbackCalled
+	default:
+		return fmt.Errorf("unknown ProcessExecuteStatusCode: %s", status)
+	}
+	return nil
+}
+
+// ToString maps enum values to their corresponding string names.
+func (p ProcessExecuteStatusCode) ToString() string {
+	switch p {
+	case CompletedSuccessfully:
+		return "CompletedSuccessfully"
+	case Aborted:
+		return "Aborted"
+	case HasMinorErrors:
+		return "HasMinorErrors"
+	case QuitCalled:
+		return "QuitCalled"
+	case CompletedWithMessages:
+		return "CompletedWithMessages"
+	case RollbackCalled:
+		return "RollbackCalled"
+	default:
+		return "Unknown"
+	}
+}
+
 const BeginGeneratedStatements = "#****Begin: Generated Statements***"
 const EndGeneratedStatements = "#****End: Generated Statements****"
 
@@ -98,8 +157,8 @@ type ErrorLogFile struct {
 }
 
 type ProcessExecuteResult struct {
-	ProcessExecuteStatusCode string       `json:"ProcessExecuteStatusCode"`
-	ErrorLogFile             ErrorLogFile `json:"ErrorLogFile"`
+	ProcessExecuteStatusCode ProcessExecuteStatusCode `json:"ProcessExecuteStatusCode"`
+	ErrorLogFile             ErrorLogFile             `json:"ErrorLogFile"`
 }
 
 func (p *Process) getBody() (string, error) {

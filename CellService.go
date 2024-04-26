@@ -447,7 +447,7 @@ func (cs *CellService) ExecuteMdxToDataframe(mdx string, sandboxName string) (*D
 func (cs *CellService) ExecuteMDXViaBlob(mdx string, sandboxName string) (*DataFrame, error) {
 	// create temp mdx view
 
-	// create unboud process and asciioutput data from the view into a file (csv)
+	// create unbound process and asciioutput data from the view into a file (csv)
 
 	// get the file using file service
 
@@ -474,6 +474,12 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(cubeName string, df *Da
 	err = cs.file.CreateCompressed(randomName, nil, dataBytes)
 	if err != nil {
 		return err
+	}
+
+	// Check TM1 version
+	// v11 requires .blb extension for source files
+	if !isV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+		randomName = randomName + ".blb"
 	}
 
 	// Create unboud process and use the file as a source to load data into cube
@@ -521,9 +527,13 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(cubeName string, df *Da
 	scriptString += ");"
 
 	process.DataProcedure = scriptString
-	_, err = cs.process.ExecuteProcessWithReturn(process, nil, 0)
+	executeProcessResult, err := cs.process.ExecuteProcessWithReturn(process, nil, 0)
 	if err != nil {
 		return err
+	}
+
+	if executeProcessResult.ProcessExecuteStatusCode != 0 {
+		return fmt.Errorf("error executing process: %s", executeProcessResult.ProcessExecuteStatusCode.ToString())
 	}
 
 	// Cleanup: delete file
