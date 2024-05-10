@@ -30,6 +30,19 @@ At its core, TM1go aims to provide a comprehensive, intuitive, and type-safe way
 		Password: "apple",
 	}
 
+
+#### Config for TM1 v11 Cloud
+
+	var config = tm1go.TM1ServiceConfig{
+		BaseURL:           "<base-url-for-tm1-instance>",
+		User:              "<user-name>",
+		Namespace:         "LDAP",
+		Password:          "<password>",
+		SSL:               true,
+		Verify:            true,
+		AsyncRequestsMode: false,
+	}
+
 #### Config for TM1 v12
 
     var config = tm1go.TM1ServiceConfig{
@@ -42,6 +55,7 @@ At its core, TM1go aims to provide a comprehensive, intuitive, and type-safe way
     }
 
 #### Config for TM1 v12 SAAS
+
 	var config = tm1go.TM1ServiceConfig{
 		Address:  "<ibm-workspace-url>",
 		APIKey:   "<api-key>",
