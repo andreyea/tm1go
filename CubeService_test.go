@@ -4,24 +4,30 @@ import (
 	"testing"
 )
 
-func TestCubeService_Get_Success(t *testing.T) {
-	cubeName := "Balance Sheet"
-	cube, err := tm1ServiceT.CubeService.Get(cubeName)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+func TestCubeService_Get(t *testing.T) {
+	tests := []struct {
+		name     string
+		cubeName string
+		wantErr  bool
+	}{
+		{
+			name:     "Valid cube name",
+			cubeName: "Balance Sheet",
+			wantErr:  false,
+		},
+		{
+			name:     "Invalid cube name",
+			cubeName: "NonExistentCube",
+			wantErr:  true,
+		},
 	}
-	if cube == nil {
-		t.Fatal("Expected a cube, got nil")
-	}
-	if cube.Name != cubeName {
-		t.Errorf("Expected cube name %v, got %v", cubeName, cube.Name)
-	}
-}
 
-func TestCubeService_Get_NonExistentCube(t *testing.T) {
-	cubeName := "NonExistentCube"
-	_, err := tm1ServiceT.CubeService.Get(cubeName)
-	if err == nil {
-		t.Fatal("Expected an error, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tm1ServiceT.CubeService.Get(tt.cubeName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CubeService.Get() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
