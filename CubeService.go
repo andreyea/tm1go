@@ -3,6 +3,7 @@ package tm1go
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -57,12 +58,8 @@ func (cs *CubeService) GetLastDataUpdate(cubeName string) (string, error) {
 		return "", err
 	}
 	defer response.Body.Close()
-	var lastDataUpdate string
-	err = json.NewDecoder(response.Body).Decode(&lastDataUpdate)
-	if err != nil {
-		return "", err
-	}
-	return lastDataUpdate, nil
+	body, err := io.ReadAll(response.Body)
+	return string(body), err
 }
 
 func (cs *CubeService) GetAll() ([]Cube, error) {
