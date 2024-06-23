@@ -28,7 +28,7 @@ func TestCubeService_Create(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Valid cube - no rules",
+			name:    "Valid cube - with rules",
 			cube:    tm1go.Cube{Name: "TestCube2", Dimensions: []tm1go.Dimension{{Name: "TestD1"}, {Name: "TestD2"}}, Rules: "#this is a rule"},
 			wantErr: false,
 		},
@@ -102,12 +102,78 @@ func TestCubeService_GetLastDataUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			timestamp, err := tm1ServiceT.CubeService.GetLastDataUpdate(tt.cubeName)
-			t.Logf("TIMESTAMP:%v", timestamp)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CubeService.GetLastDataUpdate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if timestamp == "" {
 				t.Errorf("CubeService.GetLastDataUpdate() error = %v, wantErr %v", "Empty timestamp", tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCubeService_GetAll(t *testing.T) {
+	t.Run("Get all cubes", func(t *testing.T) {
+		cubes, err := tm1ServiceT.CubeService.GetAll()
+		if err != nil {
+			t.Errorf("CubeService.GetAll() error = %v", err)
+		}
+		if len(cubes) == 0 {
+			t.Errorf("CubeService.GetAll() error = %v", "No cubes returned")
+		}
+	})
+}
+
+func TestCubeService_GetModelCubes(t *testing.T) {
+	t.Run("Get all cubes", func(t *testing.T) {
+		cubes, err := tm1ServiceT.CubeService.GetModelCubes()
+		if err != nil {
+			t.Errorf("CubeService.GetModelCubes() error = %v", err)
+		}
+		if len(cubes) == 0 {
+			t.Errorf("CubeService.GetModelCubes() error = %v", "No cubes returned")
+		}
+	})
+}
+
+func TestCubeService_GetControlCubes(t *testing.T) {
+	t.Run("Get all cubes", func(t *testing.T) {
+		cubes, err := tm1ServiceT.CubeService.GetControlCubes()
+		if err != nil {
+			t.Errorf("CubeService.GetControlCubes() error = %v", err)
+		}
+		if len(cubes) == 0 {
+			t.Errorf("CubeService.GetControlCubes() error = %v", "No cubes returned")
+		}
+	})
+}
+
+func TestCubeService_GetNumberOfCubes(t *testing.T) {
+	tests := []struct {
+		name             string
+		skipControlCubes bool
+		wantErr          bool
+	}{
+		{
+			name:             "Get cubes count excluding control cubes",
+			skipControlCubes: true,
+			wantErr:          false,
+		},
+		{
+			name:             "Get cubes count including control cubes",
+			skipControlCubes: false,
+			wantErr:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			count, err := tm1ServiceT.CubeService.GetNumberOfCubes(tt.skipControlCubes)
+			if err != nil {
+				t.Errorf("CubeService.GetNumberOfCubes() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if count == 0 {
+				t.Errorf("CubeService.GetNumberOfCubes() error = %v, wantErr %v", "No cubes returned", tt.wantErr)
 			}
 		})
 	}
