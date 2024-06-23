@@ -113,8 +113,9 @@ func (cs *CubeService) GetControlCubes() ([]Cube, error) {
 func (cs *CubeService) GetNumberOfCubes(skipControlCube bool) (int, error) {
 	url := "/Cubes/$count"
 	if skipControlCube {
-		url = "/ModelCubes()?$select=Name&$count"
+		url = "/ModelCubes()?$select=Name&$top=0&$count"
 	}
+
 	response, err := cs.rest.GET(url, nil, 0, nil)
 	if err != nil {
 		return 0, err
@@ -127,6 +128,7 @@ func (cs *CubeService) GetNumberOfCubes(skipControlCube bool) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+		count = result.Count
 	} else {
 		err = json.NewDecoder(response.Body).Decode(&count)
 		if err != nil {
