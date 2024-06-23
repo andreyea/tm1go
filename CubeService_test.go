@@ -178,3 +178,36 @@ func TestCubeService_GetNumberOfCubes(t *testing.T) {
 		})
 	}
 }
+func TestCubeService_GetMeasureDimension(t *testing.T) {
+	tests := []struct {
+		name     string
+		cubeName string
+		wantErr  bool
+	}{
+		{
+			name:     "Get measure dimension for a valid cube",
+			cubeName: "Balance Sheet",
+			wantErr:  false,
+		},
+		{
+			name:     "Get measure dimension for an invalid cube",
+			cubeName: "NonExistentCube",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dimension, err := tm1ServiceT.CubeService.GetMeasureDimension(tt.cubeName)
+			if err != nil && !tt.wantErr {
+				t.Errorf("CubeService.GetNumberOfCubes() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if dimension == nil && !tt.wantErr {
+				t.Errorf("CubeService.GetNumberOfCubes() error = %v, wantErr %v", "No dimension returned", tt.wantErr)
+			}
+			if tt.wantErr && err == nil {
+				t.Errorf("CubeService.GetNumberOfCubes() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
