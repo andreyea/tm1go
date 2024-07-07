@@ -10,11 +10,11 @@ func NewObjectService(rest *RestService) *ObjectService {
 
 func (os *ObjectService) Exists(url string) (bool, error) {
 	response, err := os.rest.GET(url, nil, 0, nil)
+	if response != nil && response.StatusCode == 404 {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
-	}
-	if response.StatusCode == 404 {
-		return false, nil
 	}
 	return true, nil
 }

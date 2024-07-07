@@ -379,7 +379,7 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 		// Send the request
 		rsp, err := rs.httpClient.Do(req)
 		if err != nil {
-			return nil, err
+			return rsp, err
 		}
 
 		// Check if unauthorized
@@ -398,12 +398,12 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 
 		err = verifyResponse(rsp)
 		if err != nil {
-			return nil, err
+			return rsp, err
 		}
 
 		location := rsp.Header.Get("Location")
 		if location == "" || !strings.Contains(location, "'") {
-			return nil, fmt.Errorf("failed to retrieve async_id from request %s '%s'", method, urlEndPoint)
+			return rsp, fmt.Errorf("failed to retrieve async_id from request %s '%s'", method, urlEndPoint)
 		}
 		asyncID := strings.Split(location, "'")[1]
 
@@ -431,13 +431,13 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 			if timeout > 0 || rs.CancelAtTimeout {
 				rs.cancelAsyncOperation(asyncID)
 			}
-			return nil, fmt.Errorf("failed to retrieve async response for request %s '%s'", method, urlEndPoint)
+			return rsp, fmt.Errorf("failed to retrieve async response for request %s '%s'", method, urlEndPoint)
 		}
 
 		bodyBytes, err := io.ReadAll(rsp.Body)
 
 		if err != nil {
-			return nil, err
+			return rsp, err
 		}
 		// Restore the body for future use.
 		rsp.Body = io.NopCloser(io.Reader(bytes.NewBuffer(bodyBytes)))
@@ -448,7 +448,7 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 		if asyncResult != "" {
 			statusCode, err := strconv.Atoi(asyncResult[:3])
 			if err != nil {
-				return nil, fmt.Errorf("invalid asyncresult header value: %v", err)
+				return rsp, fmt.Errorf("invalid asyncresult header value: %v", err)
 			}
 			rsp.StatusCode = statusCode
 		}
@@ -461,14 +461,14 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 		// Send the request
 		rsp, err := rs.httpClient.Do(req)
 		if err != nil {
-			return nil, err
+			return rsp, err
 		}
 
 		// Check if unauthorized
 		if rsp.StatusCode == http.StatusUnauthorized {
 			// Attempt to reconnect
 			if !rs.connect() {
-				return nil, fmt.Errorf("authentication failed")
+				return rsp, fmt.Errorf("authentication failed")
 			}
 
 			// Use exponential backoff or a fixed wait time before retrying
@@ -480,7 +480,7 @@ func (rs *RestService) request(method string, urlEndPoint string, data string, c
 
 		err = verifyResponse(rsp)
 		if err != nil {
-			return nil, err
+			return rsp, err
 		}
 		return rsp, nil
 	}
