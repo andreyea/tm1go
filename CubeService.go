@@ -208,8 +208,8 @@ func (cs *CubeService) Delete(cubeName string) error {
 }
 
 // Exists checks if a cube exists in TM1
-func (cs *CubeService) Exists(cube Cube) (bool, error) {
-	url := fmt.Sprintf("/Cubes('%v')", cube.Name)
+func (cs *CubeService) Exists(cubeName string) (bool, error) {
+	url := fmt.Sprintf("/Cubes('%v')", cubeName)
 	exists, err := cs.object.Exists(url)
 	if err != nil {
 		return false, err
@@ -241,6 +241,7 @@ func (cs *CubeService) GetAllNames(skipControlCube bool) ([]string, error) {
 	return cubeNames, nil
 }
 
+// Get a list of cubes with rules
 func (cs *CubeService) GetAllNamesWithRules(skipControlCube bool) ([]string, error) {
 	cubesEndPoint := "Cubes"
 	if skipControlCube {
