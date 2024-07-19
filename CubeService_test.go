@@ -874,3 +874,31 @@ func TestCubeService_Unlock(t *testing.T) {
 		})
 	}
 }
+
+func TestCubeService_CubeSaveData(t *testing.T) {
+	tests := []struct {
+		name     string
+		cubeName string
+		wantErr  bool
+	}{
+		{
+			name:     "Balance Sheet cube exists",
+			cubeName: "Balance Sheet",
+			wantErr:  false,
+		},
+		{
+			name:     "Invalid cube name",
+			cubeName: "NonExistentCube",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tm1ServiceT.CubeService.CubeSaveData(tt.cubeName)
+			if err != nil && !tt.wantErr {
+				t.Errorf("CubeService.Unlock() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

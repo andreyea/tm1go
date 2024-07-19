@@ -11,10 +11,11 @@ type CubeService struct {
 	rest      *RestService
 	object    *ObjectService
 	dimension *DimensionService
+	process   *ProcessService
 }
 
-func NewCubeService(rest *RestService, object *ObjectService, dimension *DimensionService) *CubeService {
-	return &CubeService{rest: rest, object: object, dimension: dimension}
+func NewCubeService(rest *RestService, object *ObjectService, dimension *DimensionService, process *ProcessService) *CubeService {
+	return &CubeService{rest: rest, object: object, dimension: dimension, process: process}
 }
 
 // Create new cube in tm1
@@ -515,34 +516,16 @@ func (cs *CubeService) Unlock(cubeName string) error {
 
 // Serializes a cube by saving data updates
 func (cs *CubeService) CubeSaveData(cubeName string) error {
-	// todo after process service is done
 
-	// python:
-	// from TM1py.Services import ProcessService
-	// ti = "CubeSaveData('{0}');".format(cube_name)
-	// process_service = ProcessService(self._rest)
-	// return process_service.execute_ti_code(ti, **kwargs)
-	return nil
-}
-
-func (cs *CubeService) GetRandomIntersection(cubeName string, uniqueName bool) ([]string, error) {
-	// Todo after dimensions service is done
-	dimensions, err := cs.GetDimensionNames(cubeName)
+	epilog := fmt.Sprintf("CubeSaveData('%v');", cubeName)
+	result, err := cs.process.ExecuteTICode("", epilog)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	// Python:
-	// from TM1py.Services import DimensionService
-	// dimension_service = DimensionService(self._rest)
-	// dimensions = self.get_dimension_names(cube_name)
-	// elements = []
-	// for dimension in dimensions:
-	// 	hierarchy = dimension_service.get(dimension).default_hierarchy
-	// 	element = random.choice(list((hierarchy.elements.keys())))
-	// 	if unique_names:
-	// 		element = '[{}].[{}]'.format(dimension, element)
-	// 	elements.append(element)
-	// return elements
 
-	return dimensions, nil
+	if result.ProcessExecuteStatusCode != CompletedSuccessfully {
+		return fmt.Errorf("Process did not complete successfully. Result: %v", result.ProcessExecuteStatusCode)
+	}
+
+	return nil
 }

@@ -101,14 +101,14 @@ func NewTM1Service(config TM1ServiceConfig) *TM1Service {
 
 	// Attach all services to the TM1Service
 	tm1Service.ObjectService = NewObjectService(tm1Service.restClient)
+	tm1Service.ProcessService = NewProcessService(tm1Service.restClient, tm1Service.ObjectService)
 	tm1Service.ConfigurationService = NewConfigurationService(tm1Service.restClient)
-	tm1Service.CubeService = NewCubeService(tm1Service.restClient, tm1Service.ObjectService, tm1Service.DimensionService)
+	tm1Service.CubeService = NewCubeService(tm1Service.restClient, tm1Service.ObjectService, tm1Service.DimensionService, tm1Service.ProcessService)
 	tm1Service.ElementService = NewElementService(tm1Service.restClient, tm1Service.ObjectService)
 	tm1Service.BatchService = NewBatchService(tm1Service.restClient)
 	tm1Service.HierarchyService = NewHierarchyService(tm1Service.restClient, tm1Service.ObjectService)
 	tm1Service.DimensionService = NewDimensionService(tm1Service.restClient, tm1Service.ObjectService, tm1Service.HierarchyService)
 	tm1Service.SubsetService = NewSubsetService(tm1Service.restClient)
-	tm1Service.ProcessService = NewProcessService(tm1Service.restClient, tm1Service.ObjectService)
 	tm1Service.FileService = NewFileService(tm1Service.restClient, tm1Service.ObjectService)
 	tm1Service.CellService = NewCellService(tm1Service.restClient, tm1Service.CubeService, tm1Service.FileService, tm1Service.ProcessService)
 	tm1Service.SandboxService = NewSandboxService(tm1Service.restClient)
