@@ -18,7 +18,7 @@ func NewBatchService(rest *RestService) *BatchService {
 // bodyBytes := json.Marshal(response.Responses[i].Body)
 // json.Unmarshal(bodyBytes, &rsp1)
 func (bs *BatchService) Batch(requests []BatchRequest) (*BatchResponses, error) {
-	if !isV1GreaterOrEqualToV2(bs.rest.version, "12.0.0") {
+	if !IsV1GreaterOrEqualToV2(bs.rest.version, "12.0.0") {
 		for i := range requests {
 			requests[i].URL = "/api/v1" + requests[i].URL
 		}

@@ -550,7 +550,7 @@ func (cs *ConfigurationService) GetProductVersion() (string, error) {
 
 // GetAdminHost is deprecated in version 12.0.0
 func (cs *ConfigurationService) GetAdminHost() (string, error) {
-	if isV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+	if IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
 		err := fmt.Errorf("GetDataDirectory is deprecated in version 12.0.0")
 		return "", err
 	}
@@ -567,7 +567,7 @@ func (cs *ConfigurationService) GetAdminHost() (string, error) {
 
 // GetDataDirectory is deprecated in version 12.0.0
 func (cs *ConfigurationService) GetDataDirectory() (string, error) {
-	if isV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+	if IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
 		err := fmt.Errorf("GetDataDirectory is deprecated in version 12.0.0")
 		return "", err
 	}

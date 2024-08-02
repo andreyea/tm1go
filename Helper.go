@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func isV1GreaterOrEqualToV2(v1, v2 string) bool {
+func IsV1GreaterOrEqualToV2(v1, v2 string) bool {
 	splitV1 := strings.Split(v1, ".")
 	splitV2 := strings.Split(v2, ".")
 

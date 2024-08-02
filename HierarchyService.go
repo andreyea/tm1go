@@ -93,7 +93,7 @@ func (hs *HierarchyService) GetDefaultMember(dimensionName string, hierarchyName
 
 // UpdateDefaultMemberViaApi updates the default member in the hierarchy in the dimension
 func (hs *HierarchyService) UpdateDefaultMemberViaApi(dimensionName string, hierarchyName string, memberName string) error {
-	if !isV1GreaterOrEqualToV2(hs.rest.version, "12.0.0") {
+	if !IsV1GreaterOrEqualToV2(hs.rest.version, "12.0.0") {
 		return fmt.Errorf("UpdateDefaultMemberViaApi is only supported in TM1 12.0.0 and later")
 	}
 	url := fmt.Sprintf("/Dimensions('%v')/Hierarchies('%v')", dimensionName, hierarchyName)
@@ -104,7 +104,7 @@ func (hs *HierarchyService) UpdateDefaultMemberViaApi(dimensionName string, hier
 
 // UpdateDefaultMember updates the default member in the hierarchy in the dimension
 func (hs *HierarchyService) UpdateDefaultMember(dimensionName string, hierarchyName string, memberName string) error {
-	if isV1GreaterOrEqualToV2(hs.rest.version, "12.0.0") {
+	if IsV1GreaterOrEqualToV2(hs.rest.version, "12.0.0") {
 		return hs.UpdateDefaultMemberViaApi(dimensionName, hierarchyName, memberName)
 	} else {
 		return fmt.Errorf("UpdateDefaultMember is not imlemented for TM1 versions earlier than 12.0.0")

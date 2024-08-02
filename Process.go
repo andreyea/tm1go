@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"time"
 )
 
 // ProcessExecuteStatusCode is the custom type for the enum.
@@ -102,8 +101,8 @@ func NewProcess(name string) *Process {
 
 // ProcessErrorLog represents a collection of error logs for the process.
 type ProcessErrorLog struct {
-	Timestamp time.Time `json:"Timestamp,omitempty"` // The date and time of the process error.
-	Content   []byte    `json:"Content,omitempty"`   // The content of the process error.
+	Timestamp string `json:"Timestamp,omitempty"` // The date and time of the process error.
+	Content   []byte `json:"Content,omitempty"`   // The content of the process error.
 }
 
 type ProcessSyntaxError struct {

@@ -19,7 +19,7 @@ func NewFileService(rest *RestService, object *ObjectService) *FileService {
 
 // Get Version Content Path
 func (fs *FileService) getVersionContentPath() string {
-	if isV1GreaterOrEqualToV2(fs.rest.version, "12.0.0") {
+	if IsV1GreaterOrEqualToV2(fs.rest.version, "12.0.0") {
 		return "Files"
 	}
 	return "Blobs"

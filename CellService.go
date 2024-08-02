@@ -478,7 +478,7 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(cubeName string, df *Da
 
 	// Check TM1 version
 	// v11 requires .blb extension for source files
-	if !isV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+	if !IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
 		randomName = randomName + ".blb"
 	}
 

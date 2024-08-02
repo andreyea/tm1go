@@ -403,7 +403,7 @@ func (cs *CubeService) SearchForRuleSubstring(substring string, skipControlCube 
 
 // Get list of dimensions names in storage order
 func (cs *CubeService) GetStorageDimensionOrder(cubeName string) ([]string, error) {
-	if isV1GreaterOrEqualToV2("11.4.0", cs.rest.version) {
+	if IsV1GreaterOrEqualToV2("11.4.0", cs.rest.version) {
 		err := fmt.Errorf("GetStorageDimensionOrder requires TM1 v11.4 or greater")
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func (cs *CubeService) GetStorageDimensionOrder(cubeName string) ([]string, erro
 
 // Update internal dimension storage order. The function returns percentage of memory saved
 func (cs *CubeService) UpdateStorageDimensionOrder(cubeName string, dimensions []string) (float64, error) {
-	if isV1GreaterOrEqualToV2("11.4.0", cs.rest.version) {
+	if IsV1GreaterOrEqualToV2("11.4.0", cs.rest.version) {
 		err := fmt.Errorf("UpdateStorageDimensionOrder requires TM1 v11.4 or greater")
 		return 0, err
 	}
@@ -462,7 +462,7 @@ func (cs *CubeService) UpdateStorageDimensionOrder(cubeName string, dimensions [
 
 // Load cube into memory
 func (cs *CubeService) Load(cubeName string) error {
-	if isV1GreaterOrEqualToV2("11.6.0", cs.rest.version) {
+	if IsV1GreaterOrEqualToV2("11.6.0", cs.rest.version) {
 		err := fmt.Errorf("Load requires TM1 v11.6 or greater")
 		return err
 	}
@@ -479,7 +479,7 @@ func (cs *CubeService) Load(cubeName string) error {
 
 // Unload cube into memory
 func (cs *CubeService) Unload(cubeName string) error {
-	if isV1GreaterOrEqualToV2("11.6.0", cs.rest.version) {
+	if IsV1GreaterOrEqualToV2("11.6.0", cs.rest.version) {
 		err := fmt.Errorf("Unload requires TM1 v11.6 or greater")
 		return err
 	}

@@ -52,7 +52,7 @@ func (ps *ProcessService) GetAll(skipControlProcesses bool) ([]Process, error) {
 		"DataSource/usesUnicode," +
 		"DataSource/subset"
 
-	if !skipControlProcesses {
+	if skipControlProcesses {
 		modelProcessFilter := "&$filter=startswith(Name,'}') eq false and startswith(Name,'{') eq false"
 		url += modelProcessFilter
 	}
@@ -73,7 +73,7 @@ func (ps *ProcessService) GetAll(skipControlProcesses bool) ([]Process, error) {
 // GetAllNames retrieves all process names from TM1
 func (ps *ProcessService) GetAllNames(skipControlProcesses bool) ([]string, error) {
 	url := "/Processes?$select=Name"
-	if !skipControlProcesses {
+	if skipControlProcesses {
 		modelProcessFilter := "&$filter=startswith(Name,'}') eq false and startswith(Name,'{') eq false"
 		url += modelProcessFilter
 	}
@@ -97,15 +97,18 @@ func (ps *ProcessService) GetAllNames(skipControlProcesses bool) ([]string, erro
 // SearchStringInCode searches for a string in the code of all processes in TM1
 func (ps *ProcessService) SearchStringInCode(searchString string, skipControlProcesses bool) ([]string, error) {
 	searchString = strings.ToLower(strings.ReplaceAll(searchString, " ", ""))
+	modelProcessFilter := ""
+	if skipControlProcesses {
+		modelProcessFilter = "startswith(Name,'}') eq false and startswith(Name,'{') eq false and "
+	}
+
 	url := fmt.Sprintf("/Processes?$select=Name&$filter="+
-		"contains(tolower(replace(PrologProcedure, ' ', '')),'%v') "+
+		modelProcessFilter+
+		"(contains(tolower(replace(PrologProcedure, ' ', '')),'%v') "+
 		"or contains(tolower(replace(MetadataProcedure, ' ', '')),'%v') "+
 		"or contains(tolower(replace(DataProcedure, ' ', '')),'%v') "+
-		"or contains(tolower(replace(EpilogProcedure, ' ', '')),'%v')", searchString, searchString, searchString, searchString)
-	if !skipControlProcesses {
-		modelProcessFilter := "&$filter=startswith(Name,'}') eq false and startswith(Name,'{') eq false"
-		url += modelProcessFilter
-	}
+		"or contains(tolower(replace(EpilogProcedure, ' ', '')),'%v'))", searchString, searchString, searchString, searchString)
+
 	response, err := ps.rest.GET(url, nil, 0, nil)
 	if err != nil {
 		return nil, err
@@ -175,7 +178,7 @@ func (ps *ProcessService) Compile(processName string) ([]ProcessSyntaxError, err
 }
 
 // Compile unbound process
-func (ps *ProcessService) CompileProcess(process Process) ([]ProcessSyntaxError, error) {
+func (ps *ProcessService) CompileProcess(process *Process) ([]ProcessSyntaxError, error) {
 	url := "/CompileProcess"
 	processBody, err := process.getBody()
 	if err != nil {
@@ -311,7 +314,8 @@ func (ps *ProcessService) SearchErrorLogFilenames(searchString string, top int, 
 	return filenames, nil
 }
 
-func (ps *ProcessService) GetErrorLogFilenams(processName string, top int, descending bool) ([]string, error) {
+// Get error log filenames for a process
+func (ps *ProcessService) GetErrorLogFileNames(processName string, top int, descending bool) ([]string, error) {
 	exists, err := ps.Exists(processName)
 	if err != nil {
 		return nil, err
@@ -359,7 +363,7 @@ func (ps *ProcessService) GetProcessErrorLogs(processName string) ([]ProcessErro
 }
 
 func (ps *ProcessService) GetLastMessageFromProcessErrorLog(processName string) (string, error) {
-	if isV1GreaterOrEqualToV2(ps.rest.version, "12.0.0") {
+	if IsV1GreaterOrEqualToV2(ps.rest.version, "12.0.0") {
 		err := fmt.Errorf("GetLastMessageFromProcessErrorLog is deprecated in version 12.0.0")
 		return "", err
 	}
