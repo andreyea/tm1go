@@ -138,7 +138,7 @@ type ProcessDataSource struct {
 	UserName                string `json:"userName,omitempty"`
 	Password                string `json:"password,omitempty"`
 	Query                   string `json:"query,omitempty"`
-	UsesUnicode             string `json:"usesUnicode,omitempty"`
+	UsesUnicode             bool   `json:"usesUnicode,omitempty"`
 	View                    string `json:"view,omitempty"`
 	Subset                  string `json:"subset,omitempty"`
 }
