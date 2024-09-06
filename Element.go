@@ -30,7 +30,7 @@ const (
 type Element struct {
 	Name       string                 `json:"Name,omitempty"`
 	UniqueName string                 `json:"UniqueName,omitempty"`
-	Type       ElementType            `json:"Type,omitempty"`
+	Type       string                 `json:"Type,omitempty"`
 	Level      int                    `json:"Level,omitempty"`
 	Index      int                    `json:"Index,omitempty"`
 	Attributes map[string]interface{} `json:"Attributes,omitempty"`
@@ -40,7 +40,7 @@ type Element struct {
 func (e *Element) getBody() (string, error) {
 	bodyAsDict := make(map[string]string)
 	bodyAsDict["Name"] = e.Name
-	bodyAsDict["Type"] = e.Type.String()
+	bodyAsDict["Type"] = e.Type
 	jsonData, err := json.Marshal(bodyAsDict)
 	if err != nil {
 		return "", err
