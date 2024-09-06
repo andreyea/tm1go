@@ -188,7 +188,7 @@ func (cs *CellService) ExtractCellsetCellsAsync(cellsetID string, cellProperties
 }
 
 // UpdateCellset updates values inside a cellset
-func (cs *CellService) UpdateCellset(cellsetID string, values []interface{}, sandboxName string) error {
+func (cs *CellService) UpdateCellset(cellsetID string, values []interface{}, valuesOrdinalOffset int, sandboxName string) error {
 
 	url := fmt.Sprintf("/Cellsets('%s')/Cells", cellsetID)
 	url, err := AddURLParameters(url, map[string]string{"!sandbox": sandboxName})
@@ -198,7 +198,7 @@ func (cs *CellService) UpdateCellset(cellsetID string, values []interface{}, san
 	data := []map[string]interface{}{}
 	for o, value := range values {
 		data = append(data, map[string]interface{}{
-			"Ordinal": o,
+			"Ordinal": o + valuesOrdinalOffset,
 			"Value":   value,
 		})
 	}
@@ -217,11 +217,11 @@ func (cs *CellService) UpdateCellsetMDX(mdx string, values []interface{}, sandbo
 		return err
 	}
 	defer cs.DeleteCellSet(cellsetID)
-	return cs.UpdateCellset(cellsetID, values, sandboxName)
+	return cs.UpdateCellset(cellsetID, values, 0, sandboxName)
 }
 
 // UpdateCellsetAsync updates values inside a cellset asynchronously
-func (cs *CellService) UpdateCellsetAsync(cellsetID string, values []interface{}, sandboxName string, maxWorkers int) error {
+/* func (cs *CellService) UpdateCellsetAsync(cellsetID string, values []interface{}, sandboxName string, maxWorkers int) error {
 	cellCount, err := cs.ExtractCellSetCount(cellsetID, sandboxName)
 	if err != nil {
 		return err
@@ -242,7 +242,11 @@ func (cs *CellService) UpdateCellsetAsync(cellsetID string, values []interface{}
 		wg.Add(1)
 		go func(skip int) {
 			defer wg.Done()
-			err := cs.UpdateCellset(cellsetID, values[skip:skip+partionSize], sandboxName)
+			end := skip + partionSize
+			if end > len(values) {
+				end = len(values)
+			}
+			err := cs.UpdateCellset(cellsetID, values[skip:end], skip, sandboxName)
 			if err != nil {
 				errChan <- err
 				return
@@ -255,7 +259,7 @@ func (cs *CellService) UpdateCellsetAsync(cellsetID string, values []interface{}
 		return <-errChan
 	}
 	return nil
-}
+} */
 
 // CellGet retrieves a cell
 // First parameter is the cube name followed by the element names
@@ -406,7 +410,7 @@ func (cs *CellService) UpdateCellsetFromDataframe(cubeName string, df *DataFrame
 	}
 	defer cs.DeleteCellSet(cellsetID)
 
-	return cs.UpdateCellset(cellsetID, df.Columns[df.Headers[len(df.Headers)-1]], sandboxName)
+	return cs.UpdateCellset(cellsetID, df.Columns[df.Headers[len(df.Headers)-1]], 0, sandboxName)
 }
 
 // ExecuteMdxToDataframe executes an MDX query and returns the result as a dataframe
@@ -537,7 +541,7 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(cubeName string, df *Da
 	}
 
 	// Cleanup: delete file
-	err = cs.file.Delete(randomName, nil)
+	err = cs.file.Delete(strings.TrimSuffix(randomName, ".blb"), nil)
 	if err != nil {
 		return err
 	}
