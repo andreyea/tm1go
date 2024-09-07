@@ -22,7 +22,11 @@ func (hs *HierarchyService) Create(hierarchy *Hierarchy) error {
 	if err != nil {
 		return err
 	}
-	_, err = hs.rest.POST(url, hierarchyBody, nil, 0, nil)
+	hierarchyBodyJson, err := json.Marshal(hierarchyBody)
+	if err != nil {
+		return err
+	}
+	_, err = hs.rest.POST(url, string(hierarchyBodyJson), nil, 0, nil)
 	return err
 }
 

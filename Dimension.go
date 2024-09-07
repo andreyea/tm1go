@@ -1,7 +1,6 @@
 package tm1go
 
 import (
-	"encoding/json"
 	"strings"
 )
 
@@ -16,30 +15,38 @@ type Dimension struct {
 }
 
 // GetBody method to create body map
-func (d *Dimension) getBody(includeLeavesHierarchy bool) (string, error) {
+func (d *Dimension) getBody(includeLeavesHierarchy bool) (map[string]interface{}, error) {
 	bodyAsDict := make(map[string]interface{})
 	bodyAsDict["Name"] = d.Name
-	bodyAsDict["UniqueName"] = d.UniqueName
+	if d.UniqueName != "" {
+		bodyAsDict["UniqueName"] = d.UniqueName
+	}
 	if d.Attributes != nil && len(d.Attributes) > 0 {
 		bodyAsDict["Attributes"] = d.Attributes
 	}
 	if d.Hierarchies != nil && len(d.Hierarchies) > 0 {
-		var hierarchies []string
+		var hierarchies []map[string]interface{}
 		for _, hierarchy := range d.Hierarchies {
 			if strings.ToLower(hierarchy.Name) != "leaves" || includeLeavesHierarchy {
 				hierarchyBody, err := hierarchy.getBody(false)
 				if err != nil {
-					return "", err
+					return nil, err
 				}
 				hierarchies = append(hierarchies, hierarchyBody)
 			}
 		}
 		bodyAsDict["Hierarchies"] = hierarchies
 	}
-	jsonData, err := json.Marshal(bodyAsDict)
-	if err != nil {
-		return "", err
-	}
+	return bodyAsDict, nil
+}
 
-	return string(jsonData), nil
+func NewDimension(name string) *Dimension {
+	return &Dimension{
+		Name: name,
+		Hierarchies: []Hierarchy{
+			{
+				Name: name,
+			},
+		},
+	}
 }

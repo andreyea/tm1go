@@ -47,7 +47,11 @@ func (es *ElementService) Create(dimensionName string, hierarchyName string, ele
 	if err != nil {
 		return err
 	}
-	_, err = es.rest.POST(url, body, nil, 0, nil)
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	_, err = es.rest.POST(url, string(jsonBody), nil, 0, nil)
 	if err != nil {
 		return err
 	}
@@ -61,7 +65,8 @@ func (es *ElementService) Update(dimensionName string, hierarchyName string, ele
 	if err != nil {
 		return err
 	}
-	_, err = es.rest.PATCH(url, body, nil, 0, nil)
+	jsonBody, err := json.Marshal(body)
+	_, err = es.rest.PATCH(url, string(jsonBody), nil, 0, nil)
 	if err != nil {
 		return err
 	}
@@ -419,8 +424,8 @@ func (es *ElementService) GetLevelsCount(dimensionName string, hierarchyName str
 }
 
 // AttributeExists checks if an attribute cube exists for the specified dimension and hierarchy
-func (es *ElementService) AttributeCubeExists(dimensionName string, hierarchyName string) (bool, error) {
-	url := fmt.Sprintf("/Cubes('%s')", "}}ElementAttributes_"+dimensionName)
+func (es *ElementService) AttributeCubeExists(dimensionName string) (bool, error) {
+	url := fmt.Sprintf("/Cubes('%s')", "}ElementAttributes_"+dimensionName)
 	return es.object.Exists(url)
 }
 
@@ -580,9 +585,12 @@ func (es *ElementService) AddEdges(dimensionName string, hierarchyName string, e
 // AddElements adds an element to the specified dimension and hierarchy
 func (es *ElementService) AddElements(dimensionName string, hierarchyName string, elements []Element) error {
 	url := fmt.Sprintf("/Dimensions('%s')/Hierarchies('%s')/Elements", dimensionName, hierarchyName)
-	body := make([]string, 0)
+	body := make([]map[string]interface{}, 0)
 	for _, element := range elements {
 		elementBody, err := element.getBody()
+		if err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}

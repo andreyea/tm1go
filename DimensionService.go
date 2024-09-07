@@ -23,7 +23,11 @@ func (ds *DimensionService) Create(dimension *Dimension) error {
 	if err != nil {
 		return err
 	}
-	_, err = ds.rest.POST(url, dimensionBody, nil, 0, nil)
+	jsonBody, err := json.Marshal(dimensionBody)
+	if err != nil {
+		return err
+	}
+	_, err = ds.rest.POST(url, string(jsonBody), nil, 0, nil)
 	return err
 }
 

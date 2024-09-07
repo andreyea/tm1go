@@ -1,7 +1,5 @@
 package tm1go
 
-import "encoding/json"
-
 type Hierarchy struct {
 	Name              string                 `json:"Name"`
 	UniqueName        string                 `json:"UniqueName,omitempty"`
@@ -21,39 +19,38 @@ type Hierarchy struct {
 	ElementAttributes []ElementAttribute     `json:"ElementAttributes,omitempty"`
 }
 
-func (h *Hierarchy) getBody(includeElementAttributes bool) (string, error) {
+func (h *Hierarchy) getBody(includeElementAttributes bool) (map[string]interface{}, error) {
 	bodyAsDict := make(map[string]interface{})
 	bodyAsDict["Name"] = h.Name
 
 	if h.Elements != nil && len(h.Elements) > 0 {
-		bodyAsDict["Elements"] = make([]map[string]interface{}, 0)
+		elements := make([]map[string]interface{}, 0)
 		for _, element := range h.Elements {
 			elementBody, err := element.getBody()
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			bodyAsDict["Elements"] = append(bodyAsDict["Elements"].([]interface{}), elementBody)
+			elements = append(elements, elementBody)
 		}
+		bodyAsDict["Elements"] = elements
 	}
 
 	if h.Edges != nil && len(h.Edges) > 0 {
-		bodyAsDict["Edges"] = make([]map[string]interface{}, 0)
+		edges := make([]map[string]interface{}, 0)
 		for _, edge := range h.Edges {
-			edgeAsDict := make(map[string]interface{})
-			edgeAsDict["ParentName"] = edge.ParentName
-			edgeAsDict["ComponentName"] = edge.ComponentName
-			edgeAsDict["Weight"] = edge.Weight
-			bodyAsDict["Edges"] = append(bodyAsDict["Edges"].([]map[string]interface{}), edgeAsDict)
+			edgeAsDict := map[string]interface{}{
+				"ParentName":    edge.ParentName,
+				"ComponentName": edge.ComponentName,
+				"Weight":        edge.Weight,
+			}
+			edges = append(edges, edgeAsDict)
 		}
+		bodyAsDict["Edges"] = edges
 	}
 
 	if includeElementAttributes && h.ElementAttributes != nil && len(h.ElementAttributes) > 0 {
-		bodyAsDict["ElementAttributes"] = h.Attributes
+		bodyAsDict["ElementAttributes"] = h.ElementAttributes
 	}
 
-	jsonData, err := json.Marshal(bodyAsDict)
-	if err != nil {
-		return "", err
-	}
-	return string(jsonData), nil
+	return bodyAsDict, nil
 }

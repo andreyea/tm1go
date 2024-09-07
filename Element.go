@@ -1,9 +1,5 @@
 package tm1go
 
-import (
-	"encoding/json"
-)
-
 // Define ElementType
 type ElementType int
 
@@ -37,13 +33,23 @@ type Element struct {
 	Hierarchy  Hierarchy              `json:"Hierarchy,omitempty"`
 }
 
-func (e *Element) getBody() (string, error) {
-	bodyAsDict := make(map[string]string)
+func (e *Element) getBody() (map[string]interface{}, error) {
+	bodyAsDict := make(map[string]interface{})
 	bodyAsDict["Name"] = e.Name
 	bodyAsDict["Type"] = e.Type
-	jsonData, err := json.Marshal(bodyAsDict)
-	if err != nil {
-		return "", err
+
+	if e.UniqueName != "" {
+		bodyAsDict["UniqueName"] = e.UniqueName
 	}
-	return string(jsonData), nil
+	if e.Level != 0 {
+		bodyAsDict["Level"] = e.Level
+	}
+	if e.Index != 0 {
+		bodyAsDict["Index"] = e.Index
+	}
+	if e.Attributes != nil && len(e.Attributes) > 0 {
+		bodyAsDict["Attributes"] = e.Attributes
+	}
+
+	return bodyAsDict, nil
 }
