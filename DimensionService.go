@@ -80,12 +80,13 @@ func (dx *DimensionService) GetAllNames() ([]string, error) {
 	return names, nil
 }
 
-// GetNumberOfDimensions retrieves the number of dimensions
+// GetNumberOfDimensions retrieves the number of dimensions in TM1
 func (ds *DimensionService) GetNumberOfDimensions(skipControlDims bool) (int, error) {
 	url := "/Dimensions/$count"
 	if skipControlDims {
-		url += "/ModelDimensions()?$select=Name&$top=0&$count"
+		url = "/ModelDimensions()?$select=Name&$top=0&$count"
 	}
+
 	response, err := ds.rest.GET(url, nil, 0, nil)
 	if err != nil {
 		return 0, err
@@ -98,6 +99,7 @@ func (ds *DimensionService) GetNumberOfDimensions(skipControlDims bool) (int, er
 		if err != nil {
 			return 0, err
 		}
+		count = result.Count
 	} else {
 		err = json.NewDecoder(response.Body).Decode(&count)
 		if err != nil {
