@@ -66,6 +66,9 @@ func (es *ElementService) Update(dimensionName string, hierarchyName string, ele
 		return err
 	}
 	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
 	_, err = es.rest.PATCH(url, string(jsonBody), nil, 0, nil)
 	if err != nil {
 		return err
