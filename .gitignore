@@ -16,4 +16,6 @@
 
 /ref
 
+/internal/*
+
 $metadata.xml
