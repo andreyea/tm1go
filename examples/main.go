@@ -26,11 +26,12 @@ func main() {
 
 	// Get TM1 version
 	ctx := context.Background()
-	version, err := client.Version(ctx)
-	if err != nil {
-		log.Fatalf("Failed to get TM1 version: %v", err)
-	}
 
-	fmt.Printf("Successfully connected to TM1\n")
-	fmt.Printf("TM1 Version: %s\n", version)
+	exists, err := client.Dimensions.Exists(ctx, "measure123")
+	if err != nil {
+		log.Fatalf("Failed to check if dimension exists: %v", err)
+	}
+	fmt.Printf("Dimension 'measure' exists: %v\n", exists)
+	fmt.Println("TM1 client operations completed successfully.")
+
 }

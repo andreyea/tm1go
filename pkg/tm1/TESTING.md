@@ -4,7 +4,8 @@ Comprehensive unit tests for the TM1go library using Go's built-in testing frame
 
 ## Test Coverage
 
-**Overall Coverage: 63.9%**
+**Overall Coverage: 50.2%**
+**Total Tests: 40**
 
 ## Running Tests
 
@@ -90,6 +91,16 @@ Tests for error handling:
 
 **Coverage:** Error types, error message formatting
 
+### dimension_service_test.go
+Tests for dimension service operations:
+- `TestDimensionServiceCreate` - Dimension creation
+- `TestDimensionServiceExists` - Dimension existence checking
+- `TestDimensionServiceGetAllNames` - Retrieving all dimension names with/without control dimensions
+- `TestDimensionServiceDelete` - Dimension deletion
+- `TestDimensionModel` - Dimension model operations (hierarchy management)
+
+**Coverage:** Dimension CRUD operations, model operations, control dimension filtering
+
 ## Test Patterns
 
 ### Table-Driven Tests
@@ -147,9 +158,10 @@ PASS: rest_service_test.go     (10/10 tests)
 PASS: tm1_service_test.go      (7/7 tests)
 PASS: options_test.go          (11/11 tests)
 PASS: errors_test.go           (1/1 tests)
+PASS: dimension_service_test.go (5/5 tests)
 
-Total: 35 tests, all passing
-Coverage: 63.9%
+Total: 40 tests, all passing
+Coverage: 50.2%
 ```
 
 ## Coverage by Component
@@ -161,6 +173,7 @@ Coverage: 63.9%
 | TM1Service | High | Core operations with mock server |
 | Options/Auth | Complete | All auth methods tested |
 | Errors | Complete | Error formatting tested |
+| DimensionService | Medium | CRUD operations tested, advanced features need coverage |
 | Async Operations | Partial | API structure tested, not execution |
 | Admin Methods | High | Mock server testing |
 
@@ -179,6 +192,8 @@ Coverage: 63.9%
 ✅ TM1Service operations (Version, Metadata, Ping, WhoAmI)
 ✅ Admin privilege checks
 ✅ Reconnection and cleanup
+✅ Dimension CRUD operations
+✅ Dimension model operations (hierarchy management)
 
 ## What's Not Tested (Yet)
 
@@ -186,7 +201,10 @@ Coverage: 63.9%
 ⚠️ Async operation execution (structure tested, not execution)
 ⚠️ CAM authentication flow (requires CAM server)
 ⚠️ Certificate-based authentication
-⚠️ Service sub-modules (not yet implemented)
+⚠️ DimensionService advanced operations (Update, GetAll, UsesAlternateHierarchies)
+⚠️ HierarchyService operations
+⚠️ SubsetService operations
+⚠️ Service sub-modules (ElementService, CubeService, CellService, ProcessService, etc.)
 
 ## Best Practices Demonstrated
 
@@ -209,8 +227,11 @@ These tests are suitable for CI/CD pipelines:
 ## Future Test Additions
 
 As new features are added, tests should be added for:
+- DimensionService advanced operations (Update, GetAll, UsesAlternateHierarchies)
+- Complete HierarchyService operations
+- Complete SubsetService operations
+- ElementService operations
 - CubeService operations
-- DimensionService operations
 - CellService operations
 - ProcessService operations
 - Additional admin operations

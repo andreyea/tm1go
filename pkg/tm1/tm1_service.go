@@ -9,7 +9,8 @@ import (
 
 // TM1Service exposes higher level helpers built on top of RestService.
 type TM1Service struct {
-	rest *RestService
+	rest       *RestService
+	Dimensions *DimensionService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -19,7 +20,10 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		return nil, err
 	}
 
-	return &TM1Service{rest: rest}, nil
+	return &TM1Service{
+		rest:       rest,
+		Dimensions: NewDimensionService(rest),
+	}, nil
 }
 
 // Rest returns the underlying REST client so additional services can be composed.

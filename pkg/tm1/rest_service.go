@@ -362,6 +362,21 @@ func (rs *RestService) RemoveDefaultHeader(key string) {
 	rs.headers.Del(key)
 }
 
+// SetBaseURL sets the base URL for the REST service (used for testing)
+func (rs *RestService) SetBaseURL(baseURLStr string) error {
+	baseURL, err := url.Parse(baseURLStr)
+	if err != nil {
+		return fmt.Errorf("parse base url: %w", err)
+	}
+
+	if !strings.HasSuffix(baseURL.Path, "/") {
+		baseURL.Path = strings.TrimRight(baseURL.Path, "/") + "/"
+	}
+
+	rs.baseURL = baseURL
+	return nil
+}
+
 func (rs *RestService) buildRequest(ctx context.Context, method, endpoint string, body io.Reader, opts ...RequestOption) (*http.Request, error) {
 	targetURL, err := rs.resolve(endpoint)
 	if err != nil {
