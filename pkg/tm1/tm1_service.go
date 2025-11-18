@@ -11,6 +11,7 @@ import (
 type TM1Service struct {
 	rest       *RestService
 	Dimensions *DimensionService
+	Processes  *ProcessService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -20,10 +21,36 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		return nil, err
 	}
 
+	// Get server version for compatibility checks
+	ctx := context.Background()
+	version, err := getServerVersion(ctx, rest)
+	if err != nil {
+		// If we can't get version, default to empty string
+		version = ""
+	}
+	rest.version = version
+
 	return &TM1Service{
 		rest:       rest,
 		Dimensions: NewDimensionService(rest),
+		Processes:  NewProcessService(rest),
 	}, nil
+}
+
+// getServerVersion retrieves the TM1 server version
+func getServerVersion(ctx context.Context, rest *RestService) (string, error) {
+	resp, err := rest.Get(ctx, "/Configuration/ProductVersion/$value")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(data)), nil
 }
 
 // Rest returns the underlying REST client so additional services can be composed.

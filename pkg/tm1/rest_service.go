@@ -21,6 +21,7 @@ type RestService struct {
 	auth      AuthProvider
 	logger    Logger
 	keepAlive bool
+	version   string
 }
 
 // NewRestService constructs a RestService using the provided configuration and options.
