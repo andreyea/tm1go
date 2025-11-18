@@ -3,6 +3,7 @@ package tm1
 import (
 	"context"
 	"io"
+	"net/http"
 	"strings"
 )
 
@@ -56,6 +57,96 @@ func (s *TM1Service) SessionID() string {
 	return s.rest.SessionID()
 }
 
+// WhoAmI returns the current authenticated user.
+func (s *TM1Service) WhoAmI(ctx context.Context) (map[string]interface{}, error) {
+	var user map[string]interface{}
+	err := s.rest.JSON(ctx, "GET", "/ActiveUser", nil, &user)
+	return user, err
+}
+
+// IsAdmin checks if the current user has admin privileges.
+func (s *TM1Service) IsAdmin(ctx context.Context) (bool, error) {
+	user, err := s.WhoAmI(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	// Check for IsAdmin key in response
+	if isAdmin := user["Type"].(string) == "Admin"; isAdmin {
+		return true, nil
+	}
+	return false, nil
+}
+
+// IsDataAdmin checks if the current user has data admin privileges.
+func (s *TM1Service) IsDataAdmin(ctx context.Context) (bool, error) {
+	user, err := s.WhoAmI(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if isDataAdmin, ok := user["IsDataAdmin"].(bool); ok {
+		return isDataAdmin, nil
+	}
+	return false, nil
+}
+
+// IsSecurityAdmin checks if the current user has security admin privileges.
+func (s *TM1Service) IsSecurityAdmin(ctx context.Context) (bool, error) {
+	user, err := s.WhoAmI(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if isSecurityAdmin, ok := user["IsSecurityAdmin"].(bool); ok {
+		return isSecurityAdmin, nil
+	}
+	return false, nil
+}
+
+// IsOpsAdmin checks if the current user has operations admin privileges.
+func (s *TM1Service) IsOpsAdmin(ctx context.Context) (bool, error) {
+	user, err := s.WhoAmI(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if isOpsAdmin, ok := user["IsOpsAdmin"].(bool); ok {
+		return isOpsAdmin, nil
+	}
+	return false, nil
+}
+
+// SandboxingDisabled checks if sandboxing is disabled for the current user.
+func (s *TM1Service) SandboxingDisabled(ctx context.Context) (bool, error) {
+	user, err := s.WhoAmI(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if sandboxingDisabled, ok := user["SandboxingDisabled"].(bool); ok {
+		return sandboxingDisabled, nil
+	}
+	return false, nil
+}
+
+// IsConnected checks if the connection to TM1 server is active.
+func (s *TM1Service) IsConnected(ctx context.Context) bool {
+	err := s.Ping(ctx)
+	return err == nil
+}
+
+// Reconnect re-establishes the connection to TM1.
+// This can be useful after a session timeout or network interruption.
+func (s *TM1Service) Reconnect(cfg Config, opts ...RestOption) error {
+	rest, err := NewRestService(cfg, opts...)
+	if err != nil {
+		return err
+	}
+	s.rest = rest
+	return nil
+}
+
 // Version returns the TM1 server product version string.
 func (s *TM1Service) Version(ctx context.Context) (string, error) {
 	resp, err := s.rest.Get(ctx, "/Configuration/ProductVersion/$value")
@@ -81,4 +172,19 @@ func (s *TM1Service) Metadata(ctx context.Context) ([]byte, error) {
 	defer resp.Body.Close()
 
 	return io.ReadAll(resp.Body)
+}
+
+// RetrieveAsyncResponse retrieves the response from an async operation using the async_id.
+func (s *TM1Service) RetrieveAsyncResponse(ctx context.Context, asyncID string) (*http.Response, error) {
+	return s.rest.RetrieveAsyncResponse(ctx, asyncID)
+}
+
+// CancelAsyncOperation cancels an async operation by its async_id.
+func (s *TM1Service) CancelAsyncOperation(ctx context.Context, asyncID string) error {
+	return s.rest.CancelAsyncOperation(ctx, asyncID)
+}
+
+// CancelRunningOperation cancels a currently running operation by thread ID.
+func (s *TM1Service) CancelRunningOperation(ctx context.Context, threadID string) error {
+	return s.rest.CancelRunningOperation(ctx, threadID)
 }

@@ -278,6 +278,80 @@ func (rs *RestService) SessionID() string {
 	return ""
 }
 
+// IsConnected checks if the connection to TM1 server is active.
+func (rs *RestService) IsConnected(ctx context.Context) bool {
+	resp, err := rs.Get(ctx, "/Configuration/ServerName/$value")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return true
+}
+
+// Version returns the cached TM1 version string.
+func (rs *RestService) Version() string {
+	// Note: In TM1py, version is set during connect.
+	// In Go, we don't cache it, so we'll need to call the API.
+	// For now, return empty - users should use TM1Service.Version(ctx)
+	return ""
+}
+
+// AddCompactJSONHeader modifies the Accept header to request compact JSON responses.
+// Returns the original Accept header value for restoration if needed.
+func (rs *RestService) AddCompactJSONHeader() string {
+	original := rs.headers.Get("Accept")
+
+	// Parse existing header
+	parts := strings.Split(original, ";")
+
+	// Insert compact format after application/json
+	if len(parts) > 0 {
+		result := []string{parts[0], "tm1.compact=v0"}
+		result = append(result, parts[1:]...)
+		modified := strings.Join(result, ";")
+		rs.headers.Set("Accept", modified)
+	}
+
+	return original
+}
+
+// RetrieveAsyncResponse retrieves the response from an async operation using the async_id.
+// The async_id is typically returned in the Location header of an async operation.
+func (rs *RestService) RetrieveAsyncResponse(ctx context.Context, asyncID string) (*http.Response, error) {
+	// TM1 async operations return a Location header with the async result URL
+	// Format: /api/v1/AsyncResults('async_id')
+	endpoint := fmt.Sprintf("/AsyncResults('%s')", asyncID)
+	return rs.Get(ctx, endpoint)
+}
+
+// CancelAsyncOperation cancels an async operation by its async_id.
+// Returns true if cancellation was successful.
+func (rs *RestService) CancelAsyncOperation(ctx context.Context, asyncID string) error {
+	endpoint := fmt.Sprintf("/AsyncResults('%s')", asyncID)
+	resp, err := rs.Delete(ctx, endpoint)
+	if err != nil {
+		return fmt.Errorf("cancel async operation: %w", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return nil
+}
+
+// CancelRunningOperation cancels a currently running operation (process, chore, etc.)
+// by terminating the session thread.
+func (rs *RestService) CancelRunningOperation(ctx context.Context, threadID string) error {
+	// In TM1, you can cancel running operations by calling the Thread endpoint
+	endpoint := fmt.Sprintf("/Threads(%s)/tm1.Cancel", threadID)
+	resp, err := rs.Post(ctx, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("cancel running operation: %w", err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return nil
+}
+
 // AddDefaultHeader appends a header that will be sent with every request.
 func (rs *RestService) AddDefaultHeader(key, value string) {
 	rs.headers.Add(key, value)
