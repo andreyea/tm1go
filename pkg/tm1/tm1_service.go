@@ -14,6 +14,7 @@ type TM1Service struct {
 	Processes   *ProcessService
 	Hierarchies *HierarchyService
 	Elements    *ElementService
+	Subsets     *SubsetService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -38,6 +39,7 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Processes:   NewProcessService(rest),
 		Hierarchies: NewHierarchyService(rest),
 		Elements:    NewElementService(rest),
+		Subsets:     NewSubsetService(rest),
 	}, nil
 }
 

@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -150,10 +152,231 @@ const (
 	AttributeTypeAlias   ElementAttributeType = "Alias"
 )
 
-// Subset represents a subset within a hierarchy
+// Subset represents a subset within a hierarchy (static or dynamic)
 type Subset struct {
-	Name          string `json:"Name"`
-	Expression    string `json:"Expression,omitempty"`
-	HierarchyName string `json:"-"`
-	DimensionName string `json:"-"`
+	Name          string   `json:"Name"`
+	DimensionName string   `json:"-"` // Not part of JSON, used internally
+	HierarchyName string   `json:"-"` // Not part of JSON, used internally
+	Alias         string   `json:"Alias,omitempty"`
+	Expression    string   `json:"Expression,omitempty"`
+	Elements      []string `json:"-"` // For static subsets, handled separately
+}
+
+// NewSubset creates a new Subset instance
+func NewSubset(dimensionName, hierarchyName, subsetName string) *Subset {
+	if hierarchyName == "" {
+		hierarchyName = dimensionName
+	}
+	return &Subset{
+		Name:          subsetName,
+		DimensionName: dimensionName,
+		HierarchyName: hierarchyName,
+		Elements:      make([]string, 0),
+	}
+}
+
+// NewStaticSubset creates a new static subset with elements
+func NewStaticSubset(dimensionName, hierarchyName, subsetName string, elements []string) *Subset {
+	if hierarchyName == "" {
+		hierarchyName = dimensionName
+	}
+	return &Subset{
+		Name:          subsetName,
+		DimensionName: dimensionName,
+		HierarchyName: hierarchyName,
+		Elements:      elements,
+	}
+}
+
+// NewDynamicSubset creates a new dynamic subset with MDX expression
+func NewDynamicSubset(dimensionName, hierarchyName, subsetName, expression string) *Subset {
+	if hierarchyName == "" {
+		hierarchyName = dimensionName
+	}
+	return &Subset{
+		Name:          subsetName,
+		DimensionName: dimensionName,
+		HierarchyName: hierarchyName,
+		Expression:    expression,
+	}
+}
+
+// AddElements adds elements to a static subset
+func (s *Subset) AddElements(elements ...string) {
+	s.Elements = append(s.Elements, elements...)
+	s.Expression = ""
+}
+
+// SetExpression sets the MDX expression for a dynamic subset
+func (s *Subset) SetExpression(expression string) {
+	s.Expression = expression
+	s.Elements = nil
+}
+
+// Type returns "dynamic" or "static" based on whether the subset has an expression
+func (s *Subset) Type() string {
+	if s.IsDynamic() {
+		return "dynamic"
+	}
+	return "static"
+}
+
+// IsDynamic returns true if the subset is dynamic (has an MDX expression)
+func (s *Subset) IsDynamic() bool {
+	return s.Expression != ""
+}
+
+// IsStatic returns true if the subset is static (no MDX expression)
+func (s *Subset) IsStatic() bool {
+	return !s.IsDynamic()
+}
+
+// Body returns the JSON representation for API requests
+func (s *Subset) Body() (string, error) {
+	bodyDict, err := s.BodyAsDict()
+	if err != nil {
+		return "", err
+	}
+
+	data, err := json.Marshal(bodyDict)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal subset: %w", err)
+	}
+
+	return string(data), nil
+}
+
+// BodyAsDict returns the body as a map for API requests
+func (s *Subset) BodyAsDict() (map[string]interface{}, error) {
+	if s.IsDynamic() {
+		return s.constructBodyDynamic(), nil
+	}
+	return s.constructBodyStatic(), nil
+}
+
+// constructBodyDynamic constructs the body for a dynamic subset
+func (s *Subset) constructBodyDynamic() map[string]interface{} {
+	body := make(map[string]interface{})
+	body["Name"] = s.Name
+
+	if s.Alias != "" {
+		body["Alias"] = s.Alias
+	}
+
+	body["Hierarchy@odata.bind"] = fmt.Sprintf(
+		"Dimensions('%s')/Hierarchies('%s')",
+		url.PathEscape(s.DimensionName),
+		url.PathEscape(s.HierarchyName))
+
+	body["Expression"] = s.Expression
+
+	return body
+}
+
+// constructBodyStatic constructs the body for a static subset
+func (s *Subset) constructBodyStatic() map[string]interface{} {
+	body := make(map[string]interface{})
+	body["Name"] = s.Name
+
+	if s.Alias != "" {
+		body["Alias"] = s.Alias
+	}
+
+	body["Hierarchy@odata.bind"] = fmt.Sprintf(
+		"Dimensions('%s')/Hierarchies('%s')",
+		url.PathEscape(s.DimensionName),
+		url.PathEscape(s.HierarchyName))
+
+	if len(s.Elements) > 0 {
+		elementBindings := make([]string, len(s.Elements))
+		for i, elem := range s.Elements {
+			elementBindings[i] = fmt.Sprintf(
+				"Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
+				url.PathEscape(s.DimensionName),
+				url.PathEscape(s.HierarchyName),
+				url.PathEscape(elem))
+		}
+		body["Elements@odata.bind"] = elementBindings
+	}
+
+	return body
+}
+
+// SubsetFromJSON creates a Subset from JSON response
+func SubsetFromJSON(data []byte) (*Subset, error) {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal subset: %w", err)
+	}
+
+	return SubsetFromDict(raw)
+}
+
+// SubsetFromDict creates a Subset from a dictionary/map
+func SubsetFromDict(dict map[string]interface{}) (*Subset, error) {
+	subset := &Subset{}
+
+	// Extract name
+	if name, ok := dict["Name"].(string); ok {
+		subset.Name = name
+	}
+
+	// Extract alias
+	if alias, ok := dict["Alias"].(string); ok {
+		subset.Alias = alias
+	}
+
+	// Extract expression for dynamic subsets
+	if expr, ok := dict["Expression"].(string); ok && expr != "" {
+		subset.Expression = expr
+	}
+
+	// Extract dimension and hierarchy from expanded Hierarchy object or UniqueName
+	if hierarchy, ok := dict["Hierarchy"].(map[string]interface{}); ok {
+		if hierName, ok := hierarchy["Name"].(string); ok {
+			subset.HierarchyName = hierName
+		}
+		if dim, ok := hierarchy["Dimension"].(map[string]interface{}); ok {
+			if dimName, ok := dim["Name"].(string); ok {
+				subset.DimensionName = dimName
+			}
+		}
+	} else if uniqueName, ok := dict["UniqueName"].(string); ok {
+		// Parse UniqueName: [DimensionName].[HierarchyName].[SubsetName]
+		// Extract dimension name from UniqueName
+		if len(uniqueName) > 0 && uniqueName[0] == '[' {
+			endIdx := 1
+			for endIdx < len(uniqueName) && uniqueName[endIdx] != ']' {
+				endIdx++
+			}
+			if endIdx < len(uniqueName) {
+				subset.DimensionName = uniqueName[1:endIdx]
+			}
+		}
+		// If hierarchy name not extracted from Hierarchy object, use dimension name
+		if subset.HierarchyName == "" {
+			subset.HierarchyName = subset.DimensionName
+		}
+	}
+
+	// Extract elements for static subsets (only if no expression)
+	if subset.Expression == "" {
+		if elements, ok := dict["Elements"].([]interface{}); ok {
+			subset.Elements = make([]string, len(elements))
+			for i, elem := range elements {
+				if elemMap, ok := elem.(map[string]interface{}); ok {
+					if name, ok := elemMap["Name"].(string); ok {
+						subset.Elements[i] = name
+					}
+				}
+			}
+		}
+	}
+
+	// If hierarchy name is still empty, use dimension name
+	if subset.HierarchyName == "" {
+		subset.HierarchyName = subset.DimensionName
+	}
+
+	return subset, nil
 }
