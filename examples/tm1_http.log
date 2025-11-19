@@ -1,2 +1,0 @@
-2025/11/18 15:51:41 [TM1-FILE] tm1go GET https://localhost:8882/api/v1/Configuration/ProductVersion/$value
-2025/11/18 15:51:41 [TM1-FILE] tm1go POST https://localhost:8882/api/v1/ActiveSession/tm1.Close
