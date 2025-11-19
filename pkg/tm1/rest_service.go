@@ -11,17 +11,41 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+)
+
+// AuthenticationMode represents the authentication method being used
+type AuthenticationMode int
+
+const (
+	AuthModeBasic            AuthenticationMode = iota + 1
+	AuthModeWIA                                 // Windows Integrated Authentication
+	AuthModeCAM                                 // CAM authentication
+	AuthModeCAMSSO                              // CAM SSO
+	AuthModeIBMCloudAPIKey                      // IBM Cloud API Key
+	AuthModeServiceToService                    // Service-to-service authentication
+	AuthModePAProxy                             // Planning Analytics Proxy
+	AuthModeBasicAPIKey                         // Basic API Key
+	AuthModeAccessToken                         // Access Token
 )
 
 // RestService manages HTTP interactions with the TM1 REST API.
 type RestService struct {
-	baseURL   *url.URL
-	client    *http.Client
-	headers   http.Header
-	auth      AuthProvider
-	logger    Logger
-	keepAlive bool
-	version   string
+	baseURL                     *url.URL
+	authURL                     *url.URL
+	client                      *http.Client
+	headers                     http.Header
+	auth                        AuthProvider
+	logger                      Logger
+	keepAlive                   bool
+	version                     string
+	authMode                    AuthenticationMode
+	kwargs                      Config // Store original config for reconnection
+	reConnectOnSessionTimeout   bool
+	reConnectOnRemoteDisconnect bool
+	asyncRequestsMode           bool
+	cancelAtTimeout             bool
+	timeout                     time.Duration
 }
 
 // NewRestService constructs a RestService using the provided configuration and options.
@@ -46,12 +70,26 @@ func NewRestService(cfg Config, opts ...RestOption) (*RestService, error) {
 	}
 
 	rs := &RestService{
-		baseURL:   baseURL,
-		client:    client,
-		headers:   cfg.HTTPHeaders(),
-		auth:      nil,
-		logger:    nopLogger{},
-		keepAlive: cfg.KeepAlive,
+		baseURL:                     baseURL,
+		client:                      client,
+		headers:                     cfg.HTTPHeaders(),
+		auth:                        nil,
+		logger:                      nopLogger{},
+		keepAlive:                   cfg.KeepAlive,
+		kwargs:                      cfg,
+		reConnectOnSessionTimeout:   cfg.ReConnectOnSessionTimeout,
+		reConnectOnRemoteDisconnect: cfg.ReConnectOnRemoteDisconnect,
+		asyncRequestsMode:           cfg.AsyncRequestsMode,
+		cancelAtTimeout:             cfg.CancelAtTimeout,
+		timeout:                     cfg.Timeout,
+	}
+
+	// Set default reconnection behavior if not specified
+	if !cfg.ReConnectOnSessionTimeout {
+		rs.reConnectOnSessionTimeout = true
+	}
+	if !cfg.ReConnectOnRemoteDisconnect {
+		rs.reConnectOnRemoteDisconnect = true
 	}
 
 	// Set up logging if enabled
@@ -81,6 +119,9 @@ func NewRestService(cfg Config, opts ...RestOption) (*RestService, error) {
 
 // setupAuthentication configures authentication based on Config settings
 func (rs *RestService) setupAuthentication(cfg Config) error {
+	// Determine authentication mode
+	rs.authMode = rs.determineAuthMode(cfg)
+
 	// Session ID takes precedence - reuse existing session
 	if cfg.SessionID != "" {
 		rs.auth = SessionCookieAuth{
@@ -90,18 +131,51 @@ func (rs *RestService) setupAuthentication(cfg Config) error {
 		return nil
 	}
 
-	// CAM Passport authentication
-	if cfg.CAMPassport != "" {
-		rs.auth = AuthFunc(func(req *http.Request) error {
-			req.Header.Set("Authorization", "CAMPassport "+cfg.CAMPassport)
-			return nil
-		})
+	// SaaS API Key authentication (v12) - basic auth with username='apikey'
+	if rs.authMode == AuthModeBasicAPIKey {
+		rs.auth = BasicAuth{
+			Username: "apikey",
+			Password: cfg.APIKey,
+		}
+		return nil
+	}
+
+	// IBM Cloud API Key authentication (v12) - requires IAM token generation
+	if cfg.APIKey != "" && rs.authMode == AuthModeIBMCloudAPIKey {
+		// Generate IBM Cloud IAM access token
+		accessToken, err := rs.generateIBMIAMCloudAccessToken(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to generate IBM Cloud access token: %w", err)
+		}
+		rs.auth = BearerToken(accessToken)
+		return nil
+	}
+
+	// Service-to-Service authentication (v12)
+	if rs.authMode == AuthModeServiceToService {
+		if cfg.ApplicationClientID == "" || cfg.ApplicationClientSecret == "" {
+			return fmt.Errorf("ApplicationClientID and ApplicationClientSecret required for service-to-service auth")
+		}
+		// Service-to-service uses special endpoint and client credentials
+		rs.auth = BasicAuth{
+			Username: cfg.ApplicationClientID,
+			Password: cfg.ApplicationClientSecret,
+		}
 		return nil
 	}
 
 	// Access Token authentication
 	if cfg.AccessToken != "" {
 		rs.auth = BearerToken(cfg.AccessToken)
+		return nil
+	}
+
+	// CAM Passport authentication
+	if cfg.CAMPassport != "" {
+		rs.auth = AuthFunc(func(req *http.Request) error {
+			req.Header.Set("Authorization", "CAMPassport "+cfg.CAMPassport)
+			return nil
+		})
 		return nil
 	}
 
@@ -118,6 +192,14 @@ func (rs *RestService) setupAuthentication(cfg Config) error {
 			return nil
 		})
 		return nil
+	}
+
+	// Windows Integrated Authentication
+	if cfg.IntegratedLogin {
+		// Note: Windows integrated auth requires platform-specific implementation
+		// This is a placeholder - actual implementation would use SSPI on Windows
+		rs.authMode = AuthModeWIA
+		return fmt.Errorf("Windows Integrated Authentication not yet implemented in Go")
 	}
 
 	// Basic authentication
@@ -376,6 +458,228 @@ func (rs *RestService) SetBaseURL(baseURLStr string) error {
 
 	rs.baseURL = baseURL
 	return nil
+}
+
+// determineAuthMode determines which authentication mode to use based on config
+func (rs *RestService) determineAuthMode(cfg Config) AuthenticationMode {
+	// Session ID reuse
+	if cfg.SessionID != "" {
+		return AuthModeBasic // treat as basic since we're reusing session
+	}
+
+	// SaaS API Key (v12) - uses basic auth with username='apikey'
+	if cfg.APIKey != "" && strings.Contains(cfg.Address, "planninganalytics.saas.ibm.com") {
+		return AuthModeBasicAPIKey
+	}
+
+	// IBM Cloud API Key (v12) - requires IAM token generation
+	if cfg.APIKey != "" && (cfg.Tenant != "" || cfg.IAMUrl != "") {
+		return AuthModeIBMCloudAPIKey
+	}
+
+	// Service-to-Service (v12)
+	if cfg.ApplicationClientID != "" && cfg.ApplicationClientSecret != "" {
+		return AuthModeServiceToService
+	}
+
+	// Access Token
+	if cfg.AccessToken != "" {
+		return AuthModeAccessToken
+	}
+
+	// CAM Passport
+	if cfg.CAMPassport != "" {
+		return AuthModeCAM
+	}
+
+	// CAM with namespace
+	if cfg.Namespace != "" {
+		return AuthModeCAM
+	}
+
+	// Windows Integrated Authentication
+	if cfg.IntegratedLogin {
+		return AuthModeWIA
+	}
+
+	// PA Proxy (for Planning Analytics Workspace)
+	if cfg.CPDUrl != "" {
+		return AuthModePAProxy
+	}
+
+	// Default to basic auth
+	return AuthModeBasic
+}
+
+// generateIBMIAMCloudAccessToken generates an IBM Cloud IAM access token
+func (rs *RestService) generateIBMIAMCloudAccessToken(cfg Config) (string, error) {
+	iamURL := cfg.IAMUrl
+	if iamURL == "" {
+		iamURL = "https://iam.cloud.ibm.com"
+	}
+
+	// Create request to IBM IAM token endpoint
+	tokenURL := fmt.Sprintf("%s/identity/token", iamURL)
+	payload := fmt.Sprintf("grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=%s", cfg.APIKey)
+
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("create token request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	// Use a separate client for IAM requests
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("execute token request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("IBM IAM token request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("decode token response: %w", err)
+	}
+
+	return tokenResp.AccessToken, nil
+}
+
+// constructServiceRoot constructs the appropriate base URL and auth URL based on deployment type
+func (rs *RestService) constructServiceRoot(cfg Config) (string, string, error) {
+	// If base URL is explicitly provided, use it
+	if cfg.BaseURL != "" {
+		return rs.constructAllVersionServiceFromBaseURL(cfg)
+	}
+
+	// IBM Cloud (v12) - uses tenant and database
+	if cfg.Tenant != "" && cfg.Database != "" {
+		return rs.constructIBMCloudServiceAndAuthRoot(cfg)
+	}
+
+	// Service-to-Service (v12) - uses instance and database
+	if cfg.Instance != "" && cfg.Database != "" {
+		return rs.constructS2SServiceAndAuthRoot(cfg)
+	}
+
+	// PA Proxy (Planning Analytics Workspace)
+	if cfg.CPDUrl != "" {
+		return rs.constructPAProxyServiceAndAuthRoot(cfg)
+	}
+
+	// Traditional v11 TM1 Server
+	return rs.constructV11ServiceAndAuthRoot(cfg)
+}
+
+func (rs *RestService) constructIBMCloudServiceAndAuthRoot(cfg Config) (string, string, error) {
+	if cfg.Address == "" || cfg.Tenant == "" || cfg.Database == "" {
+		return "", "", fmt.Errorf("Address, Tenant, and Database required for IBM Cloud deployment")
+	}
+
+	baseURL := fmt.Sprintf("https://%s/api/%s/v0/tm1/%s", cfg.Address, cfg.Tenant, cfg.Database)
+	authURL := fmt.Sprintf("%s/Configuration/ProductVersion/$value", baseURL)
+
+	return baseURL, authURL, nil
+}
+
+func (rs *RestService) constructS2SServiceAndAuthRoot(cfg Config) (string, string, error) {
+	if cfg.Instance == "" || cfg.Database == "" {
+		return "", "", fmt.Errorf("Instance and Database required for Service-to-Service deployment")
+	}
+
+	scheme := "https"
+	if !cfg.SSL {
+		scheme = "http"
+	}
+
+	host := "localhost"
+	if cfg.Address != "" {
+		host = cfg.Address
+	}
+
+	portStr := ""
+	if cfg.Port > 0 {
+		portStr = fmt.Sprintf(":%d", cfg.Port)
+	}
+
+	baseURL := fmt.Sprintf("%s://%s%s/%s/api/v1/Databases('%s')", scheme, host, portStr, cfg.Instance, cfg.Database)
+	authURL := fmt.Sprintf("%s://%s%s/%s/auth/v1/session", scheme, host, portStr, cfg.Instance)
+
+	return baseURL, authURL, nil
+}
+
+func (rs *RestService) constructPAProxyServiceAndAuthRoot(cfg Config) (string, string, error) {
+	if cfg.Address == "" || cfg.Database == "" {
+		return "", "", fmt.Errorf("Address and Database required for PA Proxy deployment")
+	}
+
+	scheme := "https"
+	if !cfg.SSL {
+		scheme = "http"
+	}
+
+	baseURL := fmt.Sprintf("%s://%s/tm1/%s/api/v1", scheme, cfg.Address, cfg.Database)
+	authURL := fmt.Sprintf("%s://%s/login", scheme, cfg.Address)
+
+	return baseURL, authURL, nil
+}
+
+func (rs *RestService) constructV11ServiceAndAuthRoot(cfg Config) (string, string, error) {
+	if cfg.Address == "" {
+		return "", "", fmt.Errorf("Address required for TM1 v11 deployment")
+	}
+
+	scheme := "https"
+	if !cfg.SSL {
+		scheme = "http"
+	}
+
+	host := cfg.Address
+	portStr := ""
+	if cfg.Port > 0 {
+		portStr = fmt.Sprintf(":%d", cfg.Port)
+	}
+
+	baseURL := fmt.Sprintf("%s://%s%s/api/v1", scheme, host, portStr)
+	authURL := fmt.Sprintf("%s/Configuration/ProductVersion/$value", baseURL)
+
+	return baseURL, authURL, nil
+}
+
+func (rs *RestService) constructAllVersionServiceFromBaseURL(cfg Config) (string, string, error) {
+	baseURL := cfg.BaseURL
+
+	// Detect deployment type from base URL
+	if strings.Contains(baseURL, "/api/") && strings.Contains(baseURL, "/v0/tm1/") {
+		// IBM Cloud format
+		authURL := baseURL + "/Configuration/ProductVersion/$value"
+		return baseURL, authURL, nil
+	} else if strings.Contains(baseURL, "/api/v1/Databases") {
+		// Service-to-Service format
+		parts := strings.Split(baseURL, "/api/v1/Databases")
+		authURL := parts[0] + "/auth/v1/session"
+		return baseURL, authURL, nil
+	} else if baseURL == strings.TrimSuffix(baseURL, "/api/v1")+"/api/v1" {
+		// Standard v11 format
+		authURL := baseURL + "/Configuration/ProductVersion/$value"
+		return baseURL, authURL, nil
+	}
+
+	// Default
+	authURL := baseURL + "/Configuration/ProductVersion/$value"
+	return baseURL, authURL, nil
 }
 
 func (rs *RestService) buildRequest(ctx context.Context, method, endpoint string, body io.Reader, opts ...RequestOption) (*http.Request, error) {

@@ -106,6 +106,33 @@ func (c Config) EffectiveBaseURL() (string, error) {
 		return strings.TrimRight(c.BaseURL, "/"), nil
 	}
 
+	// IBM Cloud / SaaS (v12) - uses tenant and database
+	if c.Tenant != "" && c.Database != "" {
+		scheme := "https"
+		if !c.SSL {
+			scheme = "http"
+		}
+		return fmt.Sprintf("%s://%s/api/%s/v0/tm1/%s", scheme, c.Address, c.Tenant, c.Database), nil
+	}
+
+	// Service-to-Service (v12) - uses instance and database
+	if c.Instance != "" && c.Database != "" {
+		scheme := "https"
+		if !c.SSL {
+			scheme = "http"
+		}
+		host := c.Address
+		if host == "" {
+			host = "localhost"
+		}
+		portStr := ""
+		if c.Port > 0 {
+			portStr = fmt.Sprintf(":%d", c.Port)
+		}
+		return fmt.Sprintf("%s://%s%s/%s/api/v1/Databases('%s')", scheme, host, portStr, c.Instance, c.Database), nil
+	}
+
+	// Traditional v11
 	scheme := "https"
 	if !c.SSL {
 		scheme = "http"
