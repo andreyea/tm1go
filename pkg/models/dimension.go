@@ -101,9 +101,9 @@ func (h *Hierarchy) AddElement(element Element) {
 // AddEdge adds a parent-child relationship
 func (h *Hierarchy) AddEdge(parentName, childName string, weight float64) {
 	h.Edges = append(h.Edges, Edge{
-		ParentName: parentName,
-		ChildName:  childName,
-		Weight:     weight,
+		ParentName:    parentName,
+		ComponentName: childName,
+		Weight:        weight,
 	})
 }
 
@@ -130,9 +130,9 @@ const (
 
 // Edge represents a parent-child relationship between elements
 type Edge struct {
-	ParentName string  `json:"ParentName"`
-	ChildName  string  `json:"ComponentName"`
-	Weight     float64 `json:"Weight,omitempty"`
+	ParentName    string  `json:"ParentName"`
+	ComponentName string  `json:"ComponentName"`
+	Weight        float64 `json:"Weight,omitempty"`
 }
 
 // ElementAttribute represents an attribute of elements

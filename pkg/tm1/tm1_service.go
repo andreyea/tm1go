@@ -9,9 +9,11 @@ import (
 
 // TM1Service exposes higher level helpers built on top of RestService.
 type TM1Service struct {
-	rest       *RestService
-	Dimensions *DimensionService
-	Processes  *ProcessService
+	rest        *RestService
+	Dimensions  *DimensionService
+	Processes   *ProcessService
+	Hierarchies *HierarchyService
+	Elements    *ElementService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -31,9 +33,11 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 	rest.version = version
 
 	return &TM1Service{
-		rest:       rest,
-		Dimensions: NewDimensionService(rest),
-		Processes:  NewProcessService(rest),
+		rest:        rest,
+		Dimensions:  NewDimensionService(rest),
+		Processes:   NewProcessService(rest),
+		Hierarchies: NewHierarchyService(rest),
+		Elements:    NewElementService(rest),
 	}, nil
 }
 
