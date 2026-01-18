@@ -1,3 +1,5 @@
+> Notice: This is an older version of TM1go and is no longer used or developed.
+
 <img src="logo.jpg" alt="alt text" width="400"/>
 
 # TM1go: Go Library for IBM Planning Analytics TM1
