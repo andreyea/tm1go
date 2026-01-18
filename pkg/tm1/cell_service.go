@@ -196,8 +196,12 @@ func (cs *CellService) WriteValue(ctx context.Context, cubeName string, elements
 
 	// Build request body
 	body := map[string]interface{}{
-		"Tuple@odata.bind": tupleBindings,
-		"Value":            value,
+		"Cells": []map[string]interface{}{
+			{
+				"Tuple@odata.bind": tupleBindings,
+			},
+		},
+		"Value": value,
 	}
 
 	// Build URL
@@ -222,12 +226,40 @@ func (cs *CellService) WriteValue(ctx context.Context, cubeName string, elements
 	return err
 }
 
-// WriteValues writes multiple cell values to a cube
-// cells is a map where keys are coordinate tuples (comma-separated element names) and values are the cell values
-// dimensions should contain the dimension names in their natural order
+// WriteValues writes multiple cell values to a cube using comma-separated coordinates.
+// cells is a map where keys are coordinate tuples (comma-separated element names) and values are the cell values.
+// dimensions should contain the dimension names in their natural order.
 func (cs *CellService) WriteValues(ctx context.Context, cubeName string, cells map[string]interface{}, dimensions []string, sandboxName string) error {
 	if len(cells) == 0 {
 		return nil // Nothing to write
+	}
+
+	coords := make([][]string, 0, len(cells))
+	values := make([]interface{}, 0, len(cells))
+
+	for coordKey, value := range cells {
+		// Parse coordinate key (comma-separated format)
+		elements := strings.Split(coordKey, ",")
+		for i := range elements {
+			elements[i] = strings.TrimSpace(elements[i])
+		}
+		coords = append(coords, elements)
+		values = append(values, value)
+	}
+
+	return cs.WriteValuesByCoords(ctx, cubeName, coords, values, dimensions, sandboxName)
+}
+
+// WriteValuesByCoords writes multiple cell values to a cube using explicit coordinates.
+// coords is a slice of element tuples (one tuple per cell), and values is the matching list of values.
+// dimensions should contain the dimension names in their natural order.
+func (cs *CellService) WriteValuesByCoords(ctx context.Context, cubeName string, coords [][]string, values []interface{}, dimensions []string, sandboxName string) error {
+	if len(coords) == 0 {
+		return nil
+	}
+
+	if len(coords) != len(values) {
+		return fmt.Errorf("coords count (%d) must match values count (%d)", len(coords), len(values))
 	}
 
 	if len(dimensions) == 0 {
@@ -240,31 +272,29 @@ func (cs *CellService) WriteValues(ctx context.Context, cubeName string, cells m
 	}
 
 	// Build an array of cell updates
-	cellUpdates := make([]map[string]interface{}, 0, len(cells))
+	cellUpdates := make([]map[string]interface{}, 0, len(coords))
 
-	for coordKey, value := range cells {
-		// Parse coordinate key (assuming comma-separated format)
-		elements := strings.Split(coordKey, ",")
-		for i := range elements {
-			elements[i] = strings.TrimSpace(elements[i])
-		}
-
+	for i, elements := range coords {
 		if len(elements) != len(dimensions) {
-			return fmt.Errorf("coordinate '%s' has %d elements but expected %d dimensions", coordKey, len(elements), len(dimensions))
+			return fmt.Errorf("coordinate at index %d has %d elements but expected %d dimensions", i, len(elements), len(dimensions))
 		}
 
 		// Build tuple bindings for this cell
 		tupleBindings := make([]string, 0, len(elements))
-		for i, elem := range elements {
-			dim := dimensions[i]
+		for j, elem := range elements {
+			dim := dimensions[j]
 			hier := dim // Default hierarchy
 			tupleBindings = append(tupleBindings, fmt.Sprintf("Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
 				url.PathEscape(dim), url.PathEscape(hier), url.PathEscape(elem)))
 		}
 
 		cellUpdate := map[string]interface{}{
-			"Tuple@odata.bind": tupleBindings,
-			"Value":            value,
+			"Cells": []map[string]interface{}{
+				{
+					"Tuple@odata.bind": tupleBindings,
+				},
+			},
+			"Value": values[i],
 		}
 		cellUpdates = append(cellUpdates, cellUpdate)
 	}
