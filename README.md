@@ -106,20 +106,18 @@ for coords, cell := range cells {
 }
 ```
 
-### Read and write a single cell
+### Write multiple values
 
 ```go
-dimensions := []string{"Year", "Measure", "Region"}
-elements := []string{"2024", "Revenue", "North"}
-
-value, err := client.Cells.GetValue(ctx, "Sales", elements, dimensions, "")
-if err != nil {
-	panic(err)
+coords := [][]string{
+	{"q1", "e1", "Value"},
+	{"q1", "e2", "Value"},
+	{"q1", "e3", "Value"},
 }
-fmt.Println("Current value:", value)
+values := []interface{}{1, 2, 3}
+dimensions := []string{"d1", "d2", "Measure"}
 
-err = client.Cells.WriteValue(ctx, "Sales", elements, dimensions, 12345.67, "")
-if err != nil {
+if err := client.Cells.WriteValuesByCoords(ctx, "3D", coords, values, dimensions, ""); err != nil {
 	panic(err)
 }
 ```
@@ -128,12 +126,14 @@ if err != nil {
 
 ```go
 params := map[string]interface{}{
-	"pYear": "2024",
+    "pLogOutput":           "0",
+    "pStrictErrorHandling": "0",
+    "pWaitSec":             "1",
 }
 
-ok, status, msg, err := client.Processes.ExecuteWithReturn(ctx, "Load_Sales", params, nil, false)
+ok, status, msg, err := client.Processes.ExecuteWithReturn(ctx, "}bedrock.server.wait", params, nil, false)
 if err != nil {
-	panic(err)
+    panic(err)
 }
 fmt.Printf("Success=%v Status=%s Message=%s\n", ok, status, msg)
 ```
