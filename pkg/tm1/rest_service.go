@@ -225,7 +225,14 @@ func (rs *RestService) BaseURL() string {
 
 // Request executes an HTTP request against the TM1 REST API.
 // The caller is responsible for closing the returned response body.
+// If asyncRequestsMode is enabled, the request will use async mode automatically.
 func (rs *RestService) Request(ctx context.Context, method, endpoint string, body io.Reader, opts ...RequestOption) (*http.Response, error) {
+	// If asyncRequestsMode is enabled, use async request handling
+	if rs.asyncRequestsMode {
+		resp, _, err := rs.RequestAsync(ctx, method, endpoint, body, false, opts...)
+		return resp, err
+	}
+
 	req, err := rs.buildRequest(ctx, method, endpoint, body, opts...)
 	if err != nil {
 		return nil, err
@@ -324,22 +331,35 @@ func (rs *RestService) Close() {
 
 // Logout terminates the TM1 session by calling the ActiveSession/tm1.Close endpoint.
 // This properly closes the session on the TM1 server side.
+// Note: This always uses synchronous mode, regardless of asyncRequestsMode setting.
 func (rs *RestService) Logout(ctx context.Context) error {
 	// If keepAlive is set, skip logout
 	if rs.keepAlive {
 		return nil
 	}
 
-	// Create request body with Connection: close header
-	resp, err := rs.Post(ctx, "/ActiveSession/tm1.Close", nil)
+	// Build request directly without going through async mode
+	req, err := rs.buildRequest(ctx, http.MethodPost, "/ActiveSession/tm1.Close", nil)
 	if err != nil {
-		// If logout endpoint doesn't exist (404), treat as success
-		if httpErr, ok := err.(*HTTPError); ok && httpErr.StatusCode == http.StatusNotFound {
-			return nil
-		}
+		return fmt.Errorf("build logout request: %w", err)
+	}
+
+	rs.logger.Printf("tm1go %s %s", req.Method, req.URL)
+
+	resp, err := rs.client.Do(req)
+	if err != nil {
 		return fmt.Errorf("logout failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// If logout endpoint doesn't exist (404), treat as success
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	if httpErr := newHTTPError(resp); httpErr != nil {
+		return httpErr
+	}
 
 	// Discard response body
 	_, err = io.Copy(io.Discard, resp.Body)
@@ -372,14 +392,6 @@ func (rs *RestService) IsConnected(ctx context.Context) bool {
 	return true
 }
 
-// Version returns the cached TM1 version string.
-func (rs *RestService) Version() string {
-	// Note: In TM1py, version is set during connect.
-	// In Go, we don't cache it, so we'll need to call the API.
-	// For now, return empty - users should use TM1Service.Version(ctx)
-	return ""
-}
-
 // AddCompactJSONHeader modifies the Accept header to request compact JSON responses.
 // Returns the original Accept header value for restoration if needed.
 func (rs *RestService) AddCompactJSONHeader() string {
@@ -399,36 +411,185 @@ func (rs *RestService) AddCompactJSONHeader() string {
 	return original
 }
 
+// RequestAsync executes an HTTP request with async mode enabled.
+// It adds the 'Prefer: respond-async' header and handles async response polling.
+// Returns the async_id if returnAsyncID is true, otherwise polls until completion.
+func (rs *RestService) RequestAsync(ctx context.Context, method, endpoint string, body io.Reader, returnAsyncID bool, opts ...RequestOption) (*http.Response, string, error) {
+	// Add async header
+	asyncOpts := append(opts, WithHeader("Prefer", "respond-async"))
+
+	req, err := rs.buildRequest(ctx, method, endpoint, body, asyncOpts...)
+	if err != nil {
+		return nil, "", err
+	}
+
+	rs.logger.Printf("tm1go %s %s (async)", req.Method, req.URL)
+
+	resp, err := rs.client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("tm1 async request failed: %w", err)
+	}
+
+	if httpErr := newHTTPError(resp); httpErr != nil {
+		resp.Body.Close()
+		return nil, "", httpErr
+	}
+
+	// Check for async response (Location header contains async_id)
+	location := resp.Header.Get("Location")
+	if location != "" && strings.Contains(location, "'") {
+		// Extract async_id from Location header (format: /_async('async_id'))
+		asyncID := extractAsyncID(location)
+
+		// Close initial response
+		resp.Body.Close()
+
+		if returnAsyncID {
+			// Return async_id immediately
+			return nil, asyncID, nil
+		}
+
+		// Poll for completion
+		return rs.pollAsyncResponse(ctx, asyncID, method, endpoint)
+	}
+
+	// Not an async response, return as-is
+	return resp, "", nil
+}
+
+// pollAsyncResponse polls the /_async endpoint until the operation completes
+func (rs *RestService) pollAsyncResponse(ctx context.Context, asyncID, method, endpoint string) (*http.Response, string, error) {
+	timeout := rs.timeout
+	if timeout == 0 {
+		timeout = 300 * time.Second // Default 5 minutes
+	}
+
+	deadline := time.Now().Add(timeout)
+	waitTimes := []time.Duration{100 * time.Millisecond, 300 * time.Millisecond, 600 * time.Millisecond}
+	waitIndex := 0
+
+	for {
+		// Check timeout
+		if time.Now().After(deadline) {
+			if rs.cancelAtTimeout {
+				_ = rs.CancelAsyncOperation(ctx, asyncID)
+			}
+			return nil, "", fmt.Errorf("async operation timed out after %v", timeout)
+		}
+
+		// Wait before polling
+		var waitTime time.Duration
+		if waitIndex < len(waitTimes) {
+			waitTime = waitTimes[waitIndex]
+			waitIndex++
+		} else {
+			waitTime = 1 * time.Second
+		}
+
+		select {
+		case <-ctx.Done():
+			_ = rs.CancelAsyncOperation(ctx, asyncID)
+			return nil, "", ctx.Err()
+		case <-time.After(waitTime):
+		}
+
+		// Poll for result
+		resp, err := rs.RetrieveAsyncResponse(ctx, asyncID)
+		if err != nil {
+			continue // Keep polling on error
+		}
+
+		// Check if operation completed successfully
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			// Transform response if needed (for TM1 v11 compatibility)
+			return rs.transformAsyncResponse(resp)
+		}
+
+		// If status is 202 Accepted, operation is still running - continue polling
+		if resp.StatusCode == http.StatusAccepted {
+			resp.Body.Close()
+			continue
+		}
+
+		// Any other status code is an error - return it
+		if httpErr := newHTTPError(resp); httpErr != nil {
+			resp.Body.Close()
+			return nil, "", httpErr
+		}
+
+		// Unexpected status code but no error
+		resp.Body.Close()
+	}
+}
+
+// transformAsyncResponse handles response transformation for TM1 version compatibility
+func (rs *RestService) transformAsyncResponse(resp *http.Response) (*http.Response, string, error) {
+	// Read first few bytes to check if response starts with "HTTP/"
+	// This is necessary for TM1 v11 where async responses contain raw HTTP response
+	buf := make([]byte, 5)
+	n, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		resp.Body.Close()
+		return nil, "", fmt.Errorf("read response: %w", err)
+	}
+
+	// Recreate body with the read bytes
+	resp.Body = io.NopCloser(io.MultiReader(bytes.NewReader(buf[:n]), resp.Body))
+
+	// Check if response starts with "HTTP/" (TM1 v11 format)
+	if n >= 5 && string(buf[:5]) == "HTTP/" {
+		// For TM1 v11, we need to parse the embedded HTTP response
+		// For now, just log a warning and return as-is
+		// TODO: Implement full HTTP response parsing if needed
+		rs.logger.Printf("Warning: Received TM1 v11 async response format (starts with HTTP/)")
+	}
+
+	// Check for asyncresult header (TM1 v12)
+	if asyncResult := resp.Header.Get("asyncresult"); asyncResult != "" {
+		// Parse status code from asyncresult header
+		// Format: "200 OK" or "201 Created"
+		parts := strings.SplitN(asyncResult, " ", 2)
+		if len(parts) >= 1 {
+			if statusCode, err := fmt.Sscanf(parts[0], "%d", &resp.StatusCode); err == nil && statusCode == 1 {
+				// Status code successfully parsed
+			}
+		}
+	}
+
+	return resp, "", nil
+}
+
+// extractAsyncID extracts the async_id from a Location header
+// Format: /_async('async_id') or similar
+func extractAsyncID(location string) string {
+	// Find content between single quotes
+	start := strings.Index(location, "'")
+	if start == -1 {
+		return ""
+	}
+	end := strings.Index(location[start+1:], "'")
+	if end == -1 {
+		return ""
+	}
+	return location[start+1 : start+1+end]
+}
+
 // RetrieveAsyncResponse retrieves the response from an async operation using the async_id.
 // The async_id is typically returned in the Location header of an async operation.
 func (rs *RestService) RetrieveAsyncResponse(ctx context.Context, asyncID string) (*http.Response, error) {
 	// TM1 async operations return a Location header with the async result URL
-	// Format: /api/v1/AsyncResults('async_id')
-	endpoint := fmt.Sprintf("/AsyncResults('%s')", asyncID)
+	// Format: /_async('async_id')
+	endpoint := fmt.Sprintf("/_async('%s')", asyncID)
 	return rs.Get(ctx, endpoint)
 }
 
 // CancelAsyncOperation cancels an async operation by its async_id.
 // Returns true if cancellation was successful.
 func (rs *RestService) CancelAsyncOperation(ctx context.Context, asyncID string) error {
-	endpoint := fmt.Sprintf("/AsyncResults('%s')", asyncID)
+	endpoint := fmt.Sprintf("/_async('%s')", asyncID)
 	resp, err := rs.Delete(ctx, endpoint)
 	if err != nil {
 		return fmt.Errorf("cancel async operation: %w", err)
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	return nil
-}
-
-// CancelRunningOperation cancels a currently running operation (process, chore, etc.)
-// by terminating the session thread.
-func (rs *RestService) CancelRunningOperation(ctx context.Context, threadID string) error {
-	// In TM1, you can cancel running operations by calling the Thread endpoint
-	endpoint := fmt.Sprintf("/Threads(%s)/tm1.Cancel", threadID)
-	resp, err := rs.Post(ctx, endpoint, nil)
-	if err != nil {
-		return fmt.Errorf("cancel running operation: %w", err)
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, resp.Body)

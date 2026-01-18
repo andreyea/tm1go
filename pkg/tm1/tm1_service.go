@@ -15,6 +15,7 @@ type TM1Service struct {
 	Hierarchies *HierarchyService
 	Elements    *ElementService
 	Subsets     *SubsetService
+	Cells       *CellService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -40,6 +41,7 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Hierarchies: NewHierarchyService(rest),
 		Elements:    NewElementService(rest),
 		Subsets:     NewSubsetService(rest),
+		Cells:       NewCellService(rest),
 	}, nil
 }
 
@@ -219,9 +221,4 @@ func (s *TM1Service) RetrieveAsyncResponse(ctx context.Context, asyncID string) 
 // CancelAsyncOperation cancels an async operation by its async_id.
 func (s *TM1Service) CancelAsyncOperation(ctx context.Context, asyncID string) error {
 	return s.rest.CancelAsyncOperation(ctx, asyncID)
-}
-
-// CancelRunningOperation cancels a currently running operation by thread ID.
-func (s *TM1Service) CancelRunningOperation(ctx context.Context, threadID string) error {
-	return s.rest.CancelRunningOperation(ctx, threadID)
 }
