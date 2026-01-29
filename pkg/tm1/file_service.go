@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -282,17 +281,7 @@ func (fs *FileService) getVersionContentPath() string {
 		return "Blobs"
 	}
 
-	segments := strings.Split(version, ".")
-	if len(segments) == 0 {
-		return "Blobs"
-	}
-
-	major, err := strconv.Atoi(segments[0])
-	if err != nil {
-		return "Blobs"
-	}
-
-	if major >= 12 {
+	if IsV1GreaterOrEqualToV2(version, "12.0.0") {
 		return "Files"
 	}
 
