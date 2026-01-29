@@ -1,6 +1,7 @@
 package tm1
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/andreyea/tm1go/pkg/models"
+	"github.com/go-gota/gota/dataframe"
 )
 
 // CellService handles read and write operations to TM1 cubes
@@ -685,4 +689,95 @@ func contains(slice []string, value string) bool {
 		}
 	}
 	return false
+}
+
+// UpdateCellsetFromDataframeViaBlob writes data to a cube via blob using a dataframe.
+// The last dataframe column is treated as the value column; preceding columns are dimensions.
+func (cs *CellService) UpdateCellsetFromDataframeViaBlob(ctx context.Context, cubeName string, df dataframe.DataFrame, sandboxName string) error {
+	if df.Nrow() == 0 {
+		return nil
+	}
+
+	headers := df.Names()
+	if len(headers) < 2 {
+		return fmt.Errorf("dataframe must contain at least one dimension and one value column")
+	}
+
+	var buffer bytes.Buffer
+	if err := df.WriteCSV(&buffer); err != nil {
+		return fmt.Errorf("write dataframe to csv: %w", err)
+	}
+
+	fileService := NewFileService(cs.rest)
+	processService := NewProcessService(cs.rest)
+
+	fileName := fmt.Sprintf("tm1go_dataload_temp_%s.csv", RandomString(8))
+	if err := fileService.CreateCompressed(ctx, fileName, nil, buffer.Bytes()); err != nil {
+		return err
+	}
+
+	loadFileName := fileName
+	if !IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+		loadFileName = fileName + ".blb"
+	}
+
+	deleteName := strings.TrimSuffix(loadFileName, ".blb")
+	defer func() {
+		_ = fileService.Delete(ctx, deleteName, nil)
+	}()
+
+	dataSourceType := "ASCII"
+	if IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
+		dataSourceType = "#ibm.tm1.api.v1.ASCIIDataSource"
+	}
+
+	process := models.NewProcess(loadFileName)
+	process.DataSource = &models.ProcessDataSource{
+		Type:                    dataSourceType,
+		ASCIIDecimalSeparator:   ".",
+		ASCIIDelimiterChar:      ",",
+		ASCIIDelimiterType:      "Character",
+		ASCIIHeaderRecords:      1,
+		ASCIIQuoteCharacter:     "\"",
+		ASCIIThousandSeparator:  ",",
+		DataSourceNameForClient: loadFileName,
+		DataSourceNameForServer: loadFileName,
+	}
+
+	process.Variables = make([]models.ProcessVariable, len(headers))
+	for i := 0; i < len(headers)-1; i++ {
+		process.Variables[i] = models.ProcessVariable{
+			Name:      fmt.Sprintf("v%d", i+1),
+			Type:      "String",
+			StartByte: 0,
+			EndByte:   0,
+			Position:  i + 1,
+		}
+	}
+
+	valueVariable := fmt.Sprintf("v%d", len(headers))
+	process.Variables[len(headers)-1] = models.ProcessVariable{
+		Name:      valueVariable,
+		Type:      "Numeric",
+		StartByte: 0,
+		EndByte:   0,
+		Position:  len(headers),
+	}
+
+	script := "CellPutN(" + valueVariable + ",'" + cubeName + "',"
+	for i := 0; i < len(headers)-1; i++ {
+		script += "v" + fmt.Sprintf("%d", i+1) + ","
+	}
+	script = strings.TrimSuffix(script, ",") + ");"
+	process.DataProcedure = script
+
+	success, status, _, err := processService.ExecuteProcessWithReturn(ctx, process, nil)
+	if err != nil {
+		return err
+	}
+	if !success {
+		return fmt.Errorf("error executing process: %s", status)
+	}
+
+	return nil
 }
