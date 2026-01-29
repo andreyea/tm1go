@@ -28,7 +28,7 @@ type CellValue struct {
 	Ordinal        int                    `json:"Ordinal,omitempty"`
 	RuleDerived    bool                   `json:"RuleDerived,omitempty"`
 	Consolidated   bool                   `json:"Consolidated,omitempty"`
-	Updateable     bool                   `json:"Updateable,omitempty"`
+	Updateable     int                    `json:"Updateable,omitempty"`
 	FormattedValue string                 `json:"FormattedValue,omitempty"`
 	Properties     map[string]interface{} `json:"-"`
 }
@@ -36,6 +36,7 @@ type CellValue struct {
 // Cellset represents a complete cellset response
 type Cellset struct {
 	ID      string                            `json:"ID,omitempty"`
+	Cube    *Cube                             `json:"Cube,omitempty"`
 	Axes    []Axis                            `json:"Axes,omitempty"`
 	Cells   []Cell                            `json:"Cells,omitempty"`
 	CellMap map[string]map[string]interface{} `json:"-"` // Coordinate tuple -> cell properties
@@ -43,9 +44,10 @@ type Cellset struct {
 
 // Axis represents an axis in a cellset
 type Axis struct {
-	Ordinal     int     `json:"Ordinal"`
-	Tuples      []Tuple `json:"Tuples,omitempty"`
-	Cardinality int     `json:"Cardinality,omitempty"`
+	Ordinal     int         `json:"Ordinal"`
+	Cardinality int         `json:"Cardinality,omitempty"`
+	Hierarchies []Hierarchy `json:"Hierarchies,omitempty"`
+	Tuples      []Tuple     `json:"Tuples,omitempty"`
 }
 
 // Tuple represents a tuple on an axis
@@ -56,22 +58,134 @@ type Tuple struct {
 
 // Member represents a member in a tuple
 type Member struct {
-	Name          string `json:"Name"`
-	UniqueName    string `json:"UniqueName"`
-	Type          string `json:"Type,omitempty"`
-	Ordinal       int    `json:"Ordinal,omitempty"`
-	DimensionName string `json:"DimensionName,omitempty"`
-	HierarchyName string `json:"HierarchyName,omitempty"`
+	Name                string                `json:"Name"`
+	UniqueName          string                `json:"UniqueName,omitempty"`
+	Type                MemberType            `json:"Type,omitempty"`
+	Ordinal             int                   `json:"Ordinal,omitempty"`
+	IsPlaceholder       bool                  `json:"IsPlaceholder,omitempty"`
+	Weight              float64               `json:"Weight,omitempty"`
+	Attributes          Attributes            `json:"Attributes,omitempty"`
+	Hierarchy           *Hierarchy            `json:"Hierarchy,omitempty"`
+	Level               *Level                `json:"Level,omitempty"`
+	Element             *Element              `json:"Element,omitempty"`
+	Parent              *Member               `json:"Parent,omitempty"`
+	Children            []Member              `json:"Children,omitempty"`
+	LocalizedAttributes []LocalizedAttributes `json:"LocalizedAttributes,omitempty"`
+	DimensionName       string                `json:"DimensionName,omitempty"`
+	HierarchyName       string                `json:"HierarchyName,omitempty"`
 }
 
 // Cell represents a single cell in a cellset
 type Cell struct {
-	Ordinal        int         `json:"Ordinal"`
-	Value          interface{} `json:"Value,omitempty"`
-	FormattedValue string      `json:"FormattedValue,omitempty"`
-	RuleDerived    bool        `json:"RuleDerived,omitempty"`
-	Consolidated   bool        `json:"Consolidated,omitempty"`
-	Updateable     bool        `json:"Updateable,omitempty"`
+	Ordinal             int            `json:"Ordinal"`
+	Status              CellStatus     `json:"Status,omitempty"`
+	Value               interface{}    `json:"Value,omitempty"`
+	FormatString        string         `json:"FormatString,omitempty"`
+	FormattedValue      string         `json:"FormattedValue,omitempty"`
+	Updateable          int            `json:"Updateable,omitempty"`
+	RuleDerived         bool           `json:"RuleDerived,omitempty"`
+	Annotated           bool           `json:"Annotated,omitempty"`
+	Consolidated        bool           `json:"Consolidated,omitempty"`
+	NullIntersected     bool           `json:"NullIntersected,omitempty"`
+	Language            int            `json:"Language,omitempty"`
+	HasPicklist         bool           `json:"HasPicklist,omitempty"`
+	PicklistValues      []string       `json:"PicklistValues,omitempty"`
+	HasDrillthrough     bool           `json:"HasDrillthrough,omitempty"`
+	DrillthroughScripts []Drillthrough `json:"DrillthroughScripts,omitempty"`
+	Members             []Member       `json:"Members,omitempty"`
+	Annotations         []Annotation   `json:"Annotations,omitempty"`
+}
+
+// Attributes is an open type key-value container used by TM1.
+type Attributes map[string]interface{}
+
+// CellStatus represents the status of a cell.
+type CellStatus int
+
+const (
+	CellStatusNull  CellStatus = 0
+	CellStatusData  CellStatus = 1
+	CellStatusError CellStatus = 2
+)
+
+// MemberType represents the type of a member.
+type MemberType int
+
+const (
+	MemberTypeUnknown MemberType = 0
+	MemberTypeRegular MemberType = 1
+	MemberTypeAll     MemberType = 2
+	MemberTypeMeasure MemberType = 3
+	MemberTypeFormula MemberType = 4
+)
+
+// ElementType represents the type of an element.
+type ElementType int
+
+const (
+	ElementTypeNumeric      ElementType = 1
+	ElementTypeString       ElementType = 2
+	ElementTypeConsolidated ElementType = 3
+)
+
+// Cube represents a TM1 cube.
+type Cube struct {
+	Name              string     `json:"Name"`
+	Rules             string     `json:"Rules,omitempty"`
+	DrillthroughRules string     `json:"DrillthroughRules,omitempty"`
+	LastSchemaUpdate  string     `json:"LastSchemaUpdate,omitempty"`
+	LastDataUpdate    string     `json:"LastDataUpdate,omitempty"`
+	Attributes        Attributes `json:"Attributes,omitempty"`
+}
+
+// Hierarchy represents a TM1 hierarchy.
+type Hierarchy struct {
+	Name        string     `json:"Name"`
+	UniqueName  string     `json:"UniqueName,omitempty"`
+	Cardinality int        `json:"Cardinality,omitempty"`
+	Structure   int        `json:"Structure,omitempty"`
+	Visible     bool       `json:"Visible,omitempty"`
+	Attributes  Attributes `json:"Attributes,omitempty"`
+}
+
+// Level represents a TM1 level.
+type Level struct {
+	Number      int    `json:"Number"`
+	Name        string `json:"Name"`
+	UniqueName  string `json:"UniqueName,omitempty"`
+	Cardinality int    `json:"Cardinality,omitempty"`
+	Type        int    `json:"Type,omitempty"`
+}
+
+// Element represents a TM1 element.
+type Element struct {
+	Name       string      `json:"Name"`
+	UniqueName string      `json:"UniqueName,omitempty"`
+	Type       ElementType `json:"Type,omitempty"`
+	Level      int         `json:"Level,omitempty"`
+	Index      int         `json:"Index,omitempty"`
+	Attributes Attributes  `json:"Attributes,omitempty"`
+}
+
+// LocalizedAttributes represents localized attributes for an object.
+type LocalizedAttributes struct {
+	LocaleID   string     `json:"LocaleID"`
+	Attributes Attributes `json:"Attributes,omitempty"`
+}
+
+// Drillthrough represents a drillthrough script.
+type Drillthrough struct {
+	Name string `json:"Name"`
+}
+
+// Annotation represents a cell annotation.
+type Annotation struct {
+	ID            string `json:"ID"`
+	Text          string `json:"Text,omitempty"`
+	Creator       string `json:"Creator,omitempty"`
+	Created       string `json:"Created,omitempty"`
+	LastUpdatedBy string `json:"LastUpdatedBy,omitempty"`
+	LastUpdated   string `json:"LastUpdated,omitempty"`
 }
 
 // GetValue returns a single cube value from specified coordinates
@@ -122,7 +236,7 @@ func (cs *CellService) GetValue(ctx context.Context, cubeName string, elements [
 	}
 
 	// Extract first value
-	for _, cell := range cellset {
+	for _, cell := range cellset.CellMap {
 		if val, ok := cell["Value"]; ok {
 			return val, nil
 		}
@@ -131,9 +245,8 @@ func (cs *CellService) GetValue(ctx context.Context, cubeName string, elements [
 	return nil, fmt.Errorf("no value found in cellset")
 }
 
-// ExecuteMDX executes an MDX query and returns cells with their properties
-// Returns a map where keys are coordinate tuples (as strings) and values are cell property maps
-func (cs *CellService) ExecuteMDX(ctx context.Context, mdx string, cellProperties []string, sandboxName string) (map[string]map[string]interface{}, error) {
+// ExecuteMDX executes an MDX query and returns a cellset.
+func (cs *CellService) ExecuteMDX(ctx context.Context, mdx string, cellProperties []string, sandboxName string) (*Cellset, error) {
 	// Create cellset
 	cellsetID, err := cs.CreateCellset(ctx, mdx, sandboxName)
 	if err != nil {
@@ -149,8 +262,8 @@ func (cs *CellService) ExecuteMDX(ctx context.Context, mdx string, cellPropertie
 	return cellset, nil
 }
 
-// ExecuteView executes an existing cube view and returns cells with their properties
-func (cs *CellService) ExecuteView(ctx context.Context, cubeName, viewName string, private bool, cellProperties []string, sandboxName string) (map[string]map[string]interface{}, error) {
+// ExecuteView executes an existing cube view and returns a cellset.
+func (cs *CellService) ExecuteView(ctx context.Context, cubeName, viewName string, private bool, cellProperties []string, sandboxName string) (*Cellset, error) {
 	// Create cellset from view
 	cellsetID, err := cs.CreateCellsetFromView(ctx, cubeName, viewName, private, sandboxName)
 	if err != nil {
@@ -381,15 +494,15 @@ func (cs *CellService) CreateCellsetFromView(ctx context.Context, cubeName, view
 	return result.ID, nil
 }
 
-// ExtractCellset extracts cell data from a cellset
-func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cellProperties []string, deleteCellset bool, sandboxName string) (map[string]map[string]interface{}, error) {
+// ExtractCellset extracts cell data from a cellset and returns the cellset payload.
+func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cellProperties []string, deleteCellset bool, sandboxName string) (*Cellset, error) {
 	// Build query parameters
 	selectClause := "Ordinal,Value"
 	if len(cellProperties) > 0 {
 		selectClause = strings.Join(cellProperties, ",")
 	}
 
-	endpoint := fmt.Sprintf("/Cellsets('%s')?$expand=Axes($expand=Tuples($expand=Members($select=Name,UniqueName,Ordinal;$top=100000);$top=100000)),Cells($select=%s;$top=100000)",
+	endpoint := fmt.Sprintf("/Cellsets('%s')?$expand=Axes($expand=Tuples($expand=Members($select=Name,UniqueName,Ordinal))),Cells($select=%s;$expand=Members($select=Name,UniqueName))",
 		cellsetID, selectClause)
 
 	if sandboxName != "" {
@@ -403,30 +516,8 @@ func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cel
 	}
 	defer resp.Body.Close()
 
-	var cellsetData struct {
-		ID   string `json:"ID"`
-		Axes []struct {
-			Ordinal int `json:"Ordinal"`
-			Tuples  []struct {
-				Ordinal int `json:"Ordinal"`
-				Members []struct {
-					Name       string `json:"Name"`
-					UniqueName string `json:"UniqueName"`
-					Ordinal    int    `json:"Ordinal"`
-				} `json:"Members"`
-			} `json:"Tuples"`
-		} `json:"Axes"`
-		Cells []struct {
-			Ordinal        int         `json:"Ordinal"`
-			Value          interface{} `json:"Value"`
-			FormattedValue string      `json:"FormattedValue,omitempty"`
-			RuleDerived    bool        `json:"RuleDerived,omitempty"`
-			Consolidated   bool        `json:"Consolidated,omitempty"`
-			Updateable     bool        `json:"Updateable,omitempty"`
-		} `json:"Cells"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&cellsetData); err != nil {
+	cellsetData := &Cellset{}
+	if err := json.NewDecoder(resp.Body).Decode(cellsetData); err != nil {
 		return nil, fmt.Errorf("decode cellset: %w", err)
 	}
 
@@ -436,7 +527,7 @@ func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cel
 	}
 
 	// Build result map: coordinate tuple -> cell properties
-	result := make(map[string]map[string]interface{})
+	cellsetData.CellMap = make(map[string]map[string]interface{})
 
 	// Get cardinality of each axis for ordinal calculation
 	axisCardinalities := make([]int, len(cellsetData.Axes))
@@ -451,19 +542,43 @@ func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cel
 
 		// Build coordinate key from member names
 		coordParts := make([]string, 0)
-		for axisIdx, tupleIdx := range coords {
-			if axisIdx < len(cellsetData.Axes) && tupleIdx < len(cellsetData.Axes[axisIdx].Tuples) {
-				tuple := cellsetData.Axes[axisIdx].Tuples[tupleIdx]
-				for _, member := range tuple.Members {
-					coordParts = append(coordParts, member.UniqueName)
+		if len(cell.Members) > 0 {
+			for memberIdx, member := range cell.Members {
+				coordPart := member.Name
+				if coordPart == "" {
+					coordPart = member.UniqueName
+				}
+				if coordPart == "" {
+					coordPart = fmt.Sprintf("Member%d", memberIdx)
+				}
+				coordParts = append(coordParts, coordPart)
+			}
+		} else {
+			for axisIdx, tupleIdx := range coords {
+				if axisIdx < len(cellsetData.Axes) && tupleIdx < len(cellsetData.Axes[axisIdx].Tuples) {
+					tuple := cellsetData.Axes[axisIdx].Tuples[tupleIdx]
+					for memberIdx, member := range tuple.Members {
+						coordPart := member.Name
+						if coordPart == "" {
+							coordPart = member.UniqueName
+						}
+						if coordPart == "" {
+							coordPart = fmt.Sprintf("Axis%dTuple%dMember%d", axisIdx, tupleIdx, memberIdx)
+						}
+						coordParts = append(coordParts, coordPart)
+					}
 				}
 			}
 		}
 		coordKey := strings.Join(coordParts, ",")
 
 		// Build cell properties map
+		value := cell.Value
+		if value == nil {
+			value = 0
+		}
 		cellProps := map[string]interface{}{
-			"Value":   cell.Value,
+			"Value":   value,
 			"Ordinal": cell.Ordinal,
 		}
 
@@ -480,10 +595,10 @@ func (cs *CellService) ExtractCellset(ctx context.Context, cellsetID string, cel
 			cellProps["Updateable"] = cell.Updateable
 		}
 
-		result[coordKey] = cellProps
+		cellsetData.CellMap[coordKey] = cellProps
 	}
 
-	return result, nil
+	return cellsetData, nil
 }
 
 // DeleteCellset deletes a cellset
