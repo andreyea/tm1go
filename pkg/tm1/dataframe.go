@@ -34,6 +34,61 @@ func (cs *CellService) ExecuteViewDataFrame(ctx context.Context, cubeName, viewN
 	return CellsetToDataFrame(cellset, dimensionNames)
 }
 
+// WriteDataFrame writes dataframe rows into a cube.
+// dimensions defines the column order for coordinates; if empty, all columns except valueColumn are used in the current dataframe order.
+// valueColumn defaults to "Value" when empty.
+func (cs *CellService) WriteDataFrame(ctx context.Context, cubeName string, df dataframe.DataFrame, dimensions []string, valueColumn string, sandboxName string) error {
+	if df.Nrow() == 0 {
+		return nil
+	}
+
+	if valueColumn == "" {
+		valueColumn = "Value"
+	}
+
+	colNames := df.Names()
+	colSet := make(map[string]struct{}, len(colNames))
+	for _, name := range colNames {
+		colSet[name] = struct{}{}
+	}
+
+	if _, ok := colSet[valueColumn]; !ok {
+		return fmt.Errorf("value column '%s' not found in dataframe", valueColumn)
+	}
+
+	if len(dimensions) == 0 {
+		dimensions = make([]string, 0, len(colNames)-1)
+		for _, name := range colNames {
+			if name == valueColumn {
+				continue
+			}
+			dimensions = append(dimensions, name)
+		}
+	}
+
+	for _, dim := range dimensions {
+		if _, ok := colSet[dim]; !ok {
+			return fmt.Errorf("dimension column '%s' not found in dataframe", dim)
+		}
+	}
+
+	valueSeries := df.Col(valueColumn)
+	coords := make([][]string, 0, df.Nrow())
+	values := make([]interface{}, 0, df.Nrow())
+
+	for row := 0; row < df.Nrow(); row++ {
+		rowCoords := make([]string, 0, len(dimensions))
+		for _, dim := range dimensions {
+			rowCoords = append(rowCoords, df.Col(dim).Elem(row).String())
+		}
+
+		values = append(values, seriesValueAt(valueSeries, row))
+		coords = append(coords, rowCoords)
+	}
+
+	return cs.WriteValuesByCoords(ctx, cubeName, coords, values, dimensions, sandboxName)
+}
+
 // CellsetToDataFrame converts a cellset into a gota DataFrame.
 // dimensionNames is optional; when provided, it should match the coordinate order in the cellset.
 func CellsetToDataFrame(cellset *Cellset, dimensionNames []string) (dataframe.DataFrame, error) {
@@ -184,6 +239,41 @@ func buildSeriesFromInterfaces(name string, values []interface{}) series.Series 
 	}
 
 	return toStringSeries(name, values)
+}
+
+func seriesValueAt(col series.Series, row int) interface{} {
+	valueStr := col.Elem(row).String()
+	switch col.Type() {
+	case series.Float:
+		if valueStr == "" {
+			return 0.0
+		}
+		val, err := strconv.ParseFloat(valueStr, 64)
+		if err != nil {
+			return valueStr
+		}
+		return val
+	case series.Int:
+		if valueStr == "" {
+			return 0
+		}
+		val, err := strconv.ParseInt(valueStr, 10, 64)
+		if err != nil {
+			return valueStr
+		}
+		return val
+	case series.Bool:
+		if valueStr == "" {
+			return false
+		}
+		val, err := strconv.ParseBool(valueStr)
+		if err != nil {
+			return valueStr
+		}
+		return val
+	default:
+		return valueStr
+	}
 }
 
 func toStringSeries(name string, values []interface{}) series.Series {
