@@ -22,7 +22,8 @@ type Process struct {
 
 // ProcessDataSource represents the data source configuration for a process
 type ProcessDataSource struct {
-	Type                    string `json:"@odata.type,omitempty"`
+	Type                    string `json:"Type,omitempty"`
+	ODataType               string `json:"@odata.type,omitempty"`
 	DataSourceNameForServer string `json:"dataSourceNameForServer,omitempty"`
 	DataSourceNameForClient string `json:"dataSourceNameForClient,omitempty"`
 	ASCIIDecimalSeparator   string `json:"asciiDecimalSeparator,omitempty"`

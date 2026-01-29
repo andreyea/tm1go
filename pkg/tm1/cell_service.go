@@ -727,13 +727,15 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(ctx context.Context, cu
 	}()
 
 	dataSourceType := "ASCII"
+	odataType := ""
 	if IsV1GreaterOrEqualToV2(cs.rest.version, "12.0.0") {
-		dataSourceType = "#ibm.tm1.api.v1.ASCIIDataSource"
+		odataType = "#ibm.tm1.api.v1.ASCIIDataSource"
 	}
 
 	process := models.NewProcess(loadFileName)
 	process.DataSource = &models.ProcessDataSource{
 		Type:                    dataSourceType,
+		ODataType:               odataType,
 		ASCIIDecimalSeparator:   ".",
 		ASCIIDelimiterChar:      ",",
 		ASCIIDelimiterType:      "Character",
