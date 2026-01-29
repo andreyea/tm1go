@@ -16,6 +16,7 @@ type TM1Service struct {
 	Elements    *ElementService
 	Subsets     *SubsetService
 	Cells       *CellService
+	Files       *FileService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -42,6 +43,7 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Elements:    NewElementService(rest),
 		Subsets:     NewSubsetService(rest),
 		Cells:       NewCellService(rest),
+		Files:       NewFileService(rest),
 	}, nil
 }
 
