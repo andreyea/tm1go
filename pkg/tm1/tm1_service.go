@@ -30,7 +30,10 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 	ctx := context.Background()
 	version, err := getServerVersion(ctx, rest)
 	if err != nil {
-		// If we can't get version, default to empty string
+		if httpErr, ok := err.(*HTTPError); ok && (httpErr.StatusCode == http.StatusUnauthorized || httpErr.StatusCode == http.StatusForbidden) {
+			return nil, err
+		}
+		// If we can't get version (non-auth errors), default to empty string
 		version = ""
 	}
 	rest.version = version
