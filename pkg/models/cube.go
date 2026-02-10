@@ -8,24 +8,19 @@ import (
 
 // Cube represents a TM1 cube
 type Cube struct {
-	OdataContext      string      `json:"@odata.context,omitempty"`
-	OdataEtag         string      `json:"@odata.etag,omitempty"`
-	Name              string      `json:"Name"`
-	Rules             string      `json:"Rules,omitempty"`
-	DrillthroughRules string      `json:"DrillthroughRules,omitempty"`
-	LastSchemaUpdate  time.Time   `json:"LastSchemaUpdate,omitempty"`
-	LastDataUpdate    time.Time   `json:"LastDataUpdate,omitempty"`
-	Dimensions        []Dimension `json:"Dimensions,omitempty"`
-	Views             []View      `json:"Views,omitempty"`
-	PrivateViews      []View      `json:"PrivateViews,omitempty"`
+	OdataContext      string           `json:"@odata.context,omitempty"`
+	OdataEtag         string           `json:"@odata.etag,omitempty"`
+	Name              string           `json:"Name"`
+	Rules             string           `json:"Rules,omitempty"`
+	DrillthroughRules string           `json:"DrillthroughRules,omitempty"`
+	LastSchemaUpdate  time.Time        `json:"LastSchemaUpdate,omitempty"`
+	LastDataUpdate    time.Time        `json:"LastDataUpdate,omitempty"`
+	Dimensions        []Dimension      `json:"Dimensions,omitempty"`
+	Views             []ViewDefinition `json:"Views,omitempty"`
+	PrivateViews      []ViewDefinition `json:"PrivateViews,omitempty"`
 
 	// DimensionNames can be used to build cube creation payload without requiring Dimension objects
 	DimensionNames []string `json:"-"`
-}
-
-// View represents a cube view
-type View struct {
-	Name string `json:"Name"`
 }
 
 // RuleSyntaxError represents a cube rule syntax error
@@ -39,8 +34,8 @@ func NewCube(name string, dimensionNames ...string) *Cube {
 	return &Cube{
 		Name:           name,
 		Dimensions:     make([]Dimension, 0),
-		Views:          make([]View, 0),
-		PrivateViews:   make([]View, 0),
+		Views:          make([]ViewDefinition, 0),
+		PrivateViews:   make([]ViewDefinition, 0),
 		DimensionNames: append([]string{}, dimensionNames...),
 	}
 }
