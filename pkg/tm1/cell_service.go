@@ -40,7 +40,7 @@ type CellValue struct {
 // Cellset represents a complete cellset response
 type Cellset struct {
 	ID      string                            `json:"ID,omitempty"`
-	Cube    *Cube                             `json:"Cube,omitempty"`
+	Cube    *models.Cube                      `json:"Cube,omitempty"`
 	Axes    []Axis                            `json:"Axes,omitempty"`
 	Cells   []Cell                            `json:"Cells,omitempty"`
 	CellMap map[string]map[string]interface{} `json:"-"` // Coordinate tuple -> cell properties
@@ -131,16 +131,6 @@ const (
 	ElementTypeString       ElementType = 2
 	ElementTypeConsolidated ElementType = 3
 )
-
-// Cube represents a TM1 cube.
-type Cube struct {
-	Name              string     `json:"Name"`
-	Rules             string     `json:"Rules,omitempty"`
-	DrillthroughRules string     `json:"DrillthroughRules,omitempty"`
-	LastSchemaUpdate  string     `json:"LastSchemaUpdate,omitempty"`
-	LastDataUpdate    string     `json:"LastDataUpdate,omitempty"`
-	Attributes        Attributes `json:"Attributes,omitempty"`
-}
 
 // Hierarchy represents a TM1 hierarchy.
 type Hierarchy struct {
