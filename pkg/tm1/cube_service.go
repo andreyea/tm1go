@@ -239,11 +239,11 @@ func (cs *CubeService) CheckRules(ctx context.Context, cubeName string) ([]model
 
 // Delete deletes a cube
 func (cs *CubeService) Delete(ctx context.Context, cubeName string) error {
-	isDataAdmin, err := cs.isDataAdmin(ctx)
+	isAdmin, err := cs.isAdmin(ctx)
 	if err != nil {
 		return err
 	}
-	if !isDataAdmin {
+	if !isAdmin {
 		return fmt.Errorf("Delete requires Data Admin privilege")
 	}
 
@@ -492,11 +492,11 @@ func (cs *CubeService) UpdateStorageDimensionOrder(ctx context.Context, cubeName
 		return 0, fmt.Errorf("UpdateStorageDimensionOrder requires TM1 v11.4 or greater")
 	}
 
-	isDataAdmin, err := cs.isDataAdmin(ctx)
+	isAdmin, err := cs.isAdmin(ctx)
 	if err != nil {
 		return 0, err
 	}
-	if !isDataAdmin {
+	if !isAdmin {
 		return 0, fmt.Errorf("UpdateStorageDimensionOrder requires Data Admin privilege")
 	}
 
@@ -542,11 +542,11 @@ func (cs *CubeService) Load(ctx context.Context, cubeName string) error {
 		return fmt.Errorf("Load requires TM1 v11.6 or greater")
 	}
 
-	isDataAdmin, err := cs.isDataAdmin(ctx)
+	isAdmin, err := cs.isAdmin(ctx)
 	if err != nil {
 		return err
 	}
-	if !isDataAdmin {
+	if !isAdmin {
 		return fmt.Errorf("Load requires Data Admin privilege")
 	}
 
@@ -566,11 +566,11 @@ func (cs *CubeService) Unload(ctx context.Context, cubeName string) error {
 		return fmt.Errorf("Unload requires TM1 v11.6 or greater")
 	}
 
-	isDataAdmin, err := cs.isDataAdmin(ctx)
+	isAdmin, err := cs.isAdmin(ctx)
 	if err != nil {
 		return err
 	}
-	if !isDataAdmin {
+	if !isAdmin {
 		return fmt.Errorf("Unload requires Data Admin privilege")
 	}
 
@@ -625,15 +625,15 @@ func (cs *CubeService) CubeSaveData(ctx context.Context, cubeName string) error 
 	return nil
 }
 
-func (cs *CubeService) isDataAdmin(ctx context.Context) (bool, error) {
+func (cs *CubeService) isAdmin(ctx context.Context) (bool, error) {
 	var user map[string]interface{}
-	err := cs.rest.JSON(ctx, "GET", "/ActiveUser", nil, &user)
+	err := cs.rest.JSON(ctx, "GET", "/ActiveUser?$select=Type", nil, &user)
 	if err != nil {
 		return false, err
 	}
 
-	if isDataAdmin, ok := user["IsDataAdmin"].(bool); ok {
-		return isDataAdmin, nil
+	if typeStr, ok := user["Type"].(string); ok {
+		return strings.ToLower(typeStr) == "admin", nil
 	}
 
 	return false, nil
