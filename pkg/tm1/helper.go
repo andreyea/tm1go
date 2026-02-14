@@ -124,6 +124,15 @@ func AddURLParameters(baseURL string, params map[string]string) (string, error) 
 	return u.String(), nil
 }
 
+// EncodeODataQuery encodes OData query parameters, preserving spaces as %20.
+func EncodeODataQuery(values url.Values) string {
+	if values == nil {
+		return ""
+	}
+	encoded := values.Encode()
+	return strings.ReplaceAll(encoded, "+", "%20")
+}
+
 // SliceContains checks if a slice contains a value.
 func SliceContains[T comparable](slice []T, value T) bool {
 	for _, v := range slice {

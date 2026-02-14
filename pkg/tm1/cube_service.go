@@ -300,10 +300,15 @@ func (cs *CubeService) GetAllNames(ctx context.Context, skipControlCube bool) ([
 
 // GetAllNamesWithRules retrieves all cube names that have rules
 func (cs *CubeService) GetAllNamesWithRules(ctx context.Context, skipControlCube bool) ([]string, error) {
-	endpoint := "/Cubes?$select=Name,Rules&$filter=Rules ne null"
+	base := "/Cubes"
 	if skipControlCube {
-		endpoint = "/ModelCubes()?$select=Name,Rules&$filter=Rules ne null"
+		base = "/ModelCubes()"
 	}
+	query := url.Values{}
+	query.Set("$select", "Name,Rules")
+	query.Set("$filter", "Rules ne null")
+	encodedQuery := strings.ReplaceAll(query.Encode(), "+", "%20")
+	endpoint := fmt.Sprintf("%s?%s", base, encodedQuery)
 
 	var response struct {
 		Value []struct {
@@ -326,10 +331,15 @@ func (cs *CubeService) GetAllNamesWithRules(ctx context.Context, skipControlCube
 
 // GetAllNamesWithoutRules retrieves all cube names without rules
 func (cs *CubeService) GetAllNamesWithoutRules(ctx context.Context, skipControlCube bool) ([]string, error) {
-	endpoint := "/Cubes?$select=Name,Rules&$filter=Rules eq null"
+	base := "/Cubes"
 	if skipControlCube {
-		endpoint = "/ModelCubes()?$select=Name,Rules&$filter=Rules eq null"
+		base = "/ModelCubes()"
 	}
+	query := url.Values{}
+	query.Set("$select", "Name,Rules")
+	query.Set("$filter", "Rules eq null")
+	encodedQuery := strings.ReplaceAll(query.Encode(), "+", "%20")
+	endpoint := fmt.Sprintf("%s?%s", base, encodedQuery)
 
 	var response struct {
 		Value []struct {
@@ -374,10 +384,14 @@ func (cs *CubeService) GetDimensionNames(ctx context.Context, cubeName string) (
 // SearchForDimension finds cubes that contain a given dimension
 func (cs *CubeService) SearchForDimension(ctx context.Context, dimensionName string, skipControlCube bool) ([]string, error) {
 	cleaned := strings.ToLower(strings.ReplaceAll(dimensionName, " ", ""))
-	endpoint := fmt.Sprintf("/Cubes?$select=Name&$filter=Dimensions/any(d: replace(tolower(d/Name), ' ', '') eq '%s')", cleaned)
+	base := "/Cubes"
 	if skipControlCube {
-		endpoint = fmt.Sprintf("/ModelCubes()?$select=Name&$filter=Dimensions/any(d: replace(tolower(d/Name), ' ', '') eq '%s')", cleaned)
+		base = "/ModelCubes()"
 	}
+	query := url.Values{}
+	query.Set("$select", "Name")
+	query.Set("$filter", fmt.Sprintf("Dimensions/any(d: replace(tolower(d/Name), ' ', '') eq '%s')", cleaned))
+	endpoint := fmt.Sprintf("%s?%s", base, EncodeODataQuery(query))
 
 	var response struct {
 		Value []struct {
@@ -401,12 +415,15 @@ func (cs *CubeService) SearchForDimension(ctx context.Context, dimensionName str
 // SearchForDimensionSubstring finds cubes with dimensions matching a substring
 func (cs *CubeService) SearchForDimensionSubstring(ctx context.Context, substring string, skipControlCube bool) (map[string][]string, error) {
 	cleaned := strings.ToLower(strings.ReplaceAll(substring, " ", ""))
-	endpoint := fmt.Sprintf("/Cubes?$select=Name&$filter=Dimensions/any(d: contains(replace(tolower(d/Name), ' ', ''),'%s'))"+
-		"&$expand=Dimensions($select=Name;$filter=contains(replace(tolower(Name), ' ', ''), '%s'))", cleaned, cleaned)
+	base := "/Cubes"
 	if skipControlCube {
-		endpoint = fmt.Sprintf("/ModelCubes()?$select=Name&$filter=Dimensions/any(d: contains(replace(tolower(d/Name), ' ', ''),'%s'))"+
-			"&$expand=Dimensions($select=Name;$filter=contains(replace(tolower(Name), ' ', ''), '%s'))", cleaned, cleaned)
+		base = "/ModelCubes()"
 	}
+	query := url.Values{}
+	query.Set("$select", "Name")
+	query.Set("$filter", fmt.Sprintf("Dimensions/any(d: contains(replace(tolower(d/Name), ' ', ''),'%s'))", cleaned))
+	query.Set("$expand", fmt.Sprintf("Dimensions($select=Name;$filter=contains(replace(tolower(Name), ' ', ''), '%s'))", cleaned))
+	endpoint := fmt.Sprintf("%s?%s", base, EncodeODataQuery(query))
 
 	var response struct {
 		Value []models.Cube `json:"value"`
@@ -431,9 +448,9 @@ func (cs *CubeService) SearchForDimensionSubstring(ctx context.Context, substrin
 // SearchForRuleSubstring finds cubes whose rules contain a substring
 func (cs *CubeService) SearchForRuleSubstring(ctx context.Context, substring string, skipControlCube bool, caseInsensitive bool, spaceInsensitive bool) ([]models.Cube, error) {
 	cleaned := strings.ToLower(strings.ReplaceAll(substring, " ", ""))
-	endpoint := "/Cubes"
+	base := "/Cubes"
 	if skipControlCube {
-		endpoint = "/ModelCubes()"
+		base = "/ModelCubes()"
 	}
 
 	filter := "Rules ne null and contains("
@@ -447,7 +464,10 @@ func (cs *CubeService) SearchForRuleSubstring(ctx context.Context, substring str
 		filter += fmt.Sprintf("Rules,'%s')", substring)
 	}
 
-	endpoint = fmt.Sprintf("%s?$filter=%s&$expand=Dimensions($select=Name)", endpoint, filter)
+	query := url.Values{}
+	query.Set("$filter", filter)
+	query.Set("$expand", "Dimensions($select=Name)")
+	endpoint := fmt.Sprintf("%s?%s", base, EncodeODataQuery(query))
 
 	var response struct {
 		Value []models.Cube `json:"value"`

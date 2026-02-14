@@ -58,28 +58,29 @@ func (ps *ProcessService) Get(ctx context.Context, processName string) (*models.
 
 // GetAll retrieves all processes from TM1 Server
 func (ps *ProcessService) GetAll(ctx context.Context, skipControlProcesses bool) ([]*models.Process, error) {
-	filter := ""
+	query := url.Values{}
+	query.Set("$select", "*,UIData,VariablesUIData,"+
+		"DataSource/dataSourceNameForServer,"+
+		"DataSource/dataSourceNameForClient,"+
+		"DataSource/asciiDecimalSeparator,"+
+		"DataSource/asciiDelimiterChar,"+
+		"DataSource/asciiDelimiterType,"+
+		"DataSource/asciiHeaderRecords,"+
+		"DataSource/asciiQuoteCharacter,"+
+		"DataSource/asciiThousandSeparator,"+
+		"DataSource/view,"+
+		"DataSource/query,"+
+		"DataSource/userName,"+
+		"DataSource/password,"+
+		"DataSource/usesUnicode,"+
+		"DataSource/subset,"+
+		"DataSource/jsonRootPointer,"+
+		"DataSource/jsonVariableMapping")
 	if skipControlProcesses {
-		filter = "&$filter=startswith(Name,'}') eq false and startswith(Name,'{') eq false"
+		query.Set("$filter", "startswith(Name,'}') eq false and startswith(Name,'{') eq false")
 	}
 
-	endpoint := "/Processes?$select=*,UIData,VariablesUIData," +
-		"DataSource/dataSourceNameForServer," +
-		"DataSource/dataSourceNameForClient," +
-		"DataSource/asciiDecimalSeparator," +
-		"DataSource/asciiDelimiterChar," +
-		"DataSource/asciiDelimiterType," +
-		"DataSource/asciiHeaderRecords," +
-		"DataSource/asciiQuoteCharacter," +
-		"DataSource/asciiThousandSeparator," +
-		"DataSource/view," +
-		"DataSource/query," +
-		"DataSource/userName," +
-		"DataSource/password," +
-		"DataSource/usesUnicode," +
-		"DataSource/subset," +
-		"DataSource/jsonRootPointer," +
-		"DataSource/jsonVariableMapping" + filter
+	endpoint := "/Processes?" + EncodeODataQuery(query)
 
 	var response struct {
 		Value []*models.Process `json:"value"`
@@ -95,12 +96,13 @@ func (ps *ProcessService) GetAll(ctx context.Context, skipControlProcesses bool)
 
 // GetAllNames retrieves all process names from TM1 Server
 func (ps *ProcessService) GetAllNames(ctx context.Context, skipControlProcesses bool) ([]string, error) {
-	filter := ""
+	query := url.Values{}
+	query.Set("$select", "Name")
 	if skipControlProcesses {
-		filter = "&$filter=startswith(Name,'}') eq false and startswith(Name,'{') eq false"
+		query.Set("$filter", "startswith(Name,'}') eq false and startswith(Name,'{') eq false")
 	}
 
-	endpoint := "/Processes?$select=Name" + filter
+	endpoint := "/Processes?" + EncodeODataQuery(query)
 
 	var response struct {
 		Value []struct {
@@ -125,18 +127,21 @@ func (ps *ProcessService) GetAllNames(ctx context.Context, skipControlProcesses 
 func (ps *ProcessService) SearchStringInCode(ctx context.Context, searchString string, skipControlProcesses bool) ([]string, error) {
 	searchString = strings.ToLower(strings.ReplaceAll(searchString, " ", ""))
 
-	filter := fmt.Sprintf("$filter="+
+	filter := fmt.Sprintf(
 		"contains(tolower(replace(PrologProcedure, ' ', '')),'%s') "+
-		"or contains(tolower(replace(MetadataProcedure, ' ', '')),'%s') "+
-		"or contains(tolower(replace(DataProcedure, ' ', '')),'%s') "+
-		"or contains(tolower(replace(EpilogProcedure, ' ', '')),'%s')",
+			"or contains(tolower(replace(MetadataProcedure, ' ', '')),'%s') "+
+			"or contains(tolower(replace(DataProcedure, ' ', '')),'%s') "+
+			"or contains(tolower(replace(EpilogProcedure, ' ', '')),'%s')",
 		searchString, searchString, searchString, searchString)
 
 	if skipControlProcesses {
 		filter += " and (startswith(Name,'}') eq false and startswith(Name,'{') eq false)"
 	}
 
-	endpoint := "/Processes?$select=Name&" + filter
+	query := url.Values{}
+	query.Set("$select", "Name")
+	query.Set("$filter", filter)
+	endpoint := "/Processes?" + EncodeODataQuery(query)
 
 	var response struct {
 		Value []struct {
@@ -179,18 +184,21 @@ func (ps *ProcessService) SearchStringInName(ctx context.Context, nameStartsWith
 	}
 
 	endpoint := "/Processes?$select=Name"
+	query := url.Values{}
+	query.Set("$select", "Name")
 	if len(nameFilters) > 0 {
-		endpoint += "&$filter=" + strings.Join(nameFilters, " and ")
+		query.Set("$filter", strings.Join(nameFilters, " and "))
 	}
 
 	if skipControlProcesses {
-		if len(nameFilters) > 0 {
-			endpoint += " and "
+		if existing := query.Get("$filter"); existing != "" {
+			query.Set("$filter", existing+" and (startswith(Name,'}') eq false and startswith(Name,'{') eq false)")
 		} else {
-			endpoint += "&$filter="
+			query.Set("$filter", "(startswith(Name,'}') eq false and startswith(Name,'{') eq false)")
 		}
-		endpoint += "(startswith(Name,'}') eq false and startswith(Name,'{') eq false)"
 	}
+
+	endpoint = "/Processes?" + EncodeODataQuery(query)
 
 	var response struct {
 		Value []struct {
@@ -507,15 +515,16 @@ func (ps *ProcessService) ExecuteProcessWithReturn(ctx context.Context, process 
 
 // SearchErrorLogFilenames searches for error log filenames containing a search string
 func (ps *ProcessService) SearchErrorLogFilenames(ctx context.Context, searchString string, top int, descending bool) ([]string, error) {
-	endpoint := fmt.Sprintf("/ErrorLogFiles?$select=Filename&$filter=contains(tolower(Filename), tolower('%s'))", searchString)
-
+	query := url.Values{}
+	query.Set("$select", "Filename")
+	query.Set("$filter", fmt.Sprintf("contains(tolower(Filename), tolower('%s'))", searchString))
 	if top > 0 {
-		endpoint += fmt.Sprintf("&$top=%d", top)
+		query.Set("$top", fmt.Sprintf("%d", top))
 	}
-
 	if descending {
-		endpoint += "&$orderby=Filename desc"
+		query.Set("$orderby", "Filename desc")
 	}
+	endpoint := "/ErrorLogFiles?" + EncodeODataQuery(query)
 
 	var response struct {
 		Value []struct {
@@ -846,8 +855,9 @@ func (ps *ProcessService) DebugGetVariableValues(ctx context.Context, debugID st
 
 // DebugGetSingleVariableValue retrieves a specific variable value in a debug session
 func (ps *ProcessService) DebugGetSingleVariableValue(ctx context.Context, debugID, variableName string) (interface{}, error) {
-	endpoint := fmt.Sprintf("/ProcessDebugContexts('%s')?$expand=CallStack($expand=Variables($filter=tolower(Name) eq '%s';$select=Value))",
-		url.PathEscape(debugID), strings.ToLower(variableName))
+	query := url.Values{}
+	query.Set("$expand", fmt.Sprintf("CallStack($expand=Variables($filter=tolower(Name) eq '%s';$select=Value))", strings.ToLower(variableName)))
+	endpoint := fmt.Sprintf("/ProcessDebugContexts('%s')?%s", url.PathEscape(debugID), EncodeODataQuery(query))
 
 	var response map[string]interface{}
 	err := ps.rest.JSON(ctx, "GET", endpoint, nil, &response)
