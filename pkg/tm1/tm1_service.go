@@ -9,26 +9,27 @@ import (
 
 // TM1Service exposes higher level helpers built on top of RestService.
 type TM1Service struct {
-	rest        *RestService
-	Dimensions  *DimensionService
-	Processes   *ProcessService
-	Batches     *BatchService
-	Sandboxes   *SandboxService
-	Hierarchies *HierarchyService
-	Elements    *ElementService
-	Subsets     *SubsetService
-	Cells       *CellService
-	Files       *FileService
-	Cubes       *CubeService
-	Views       *ViewService
-	Chores      *ChoreService
-	Users       *UserService
-	Security    *SecurityService
-	Jobs        *JobService
-	Threads     *ThreadService
-	Sessions    *SessionService
-	Monitoring  *MonitoringService
-	Server      *ServerService
+	rest          *RestService
+	Dimensions    *DimensionService
+	Processes     *ProcessService
+	Batches       *BatchService
+	Sandboxes     *SandboxService
+	Hierarchies   *HierarchyService
+	Elements      *ElementService
+	Subsets       *SubsetService
+	Cells         *CellService
+	Files         *FileService
+	Cubes         *CubeService
+	Views         *ViewService
+	Chores        *ChoreService
+	Users         *UserService
+	Security      *SecurityService
+	Jobs          *JobService
+	Threads       *ThreadService
+	Sessions      *SessionService
+	Monitoring    *MonitoringService
+	Server        *ServerService
+	Configuration *ConfigurationService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -47,26 +48,27 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 	rest.version = version
 
 	return &TM1Service{
-		rest:        rest,
-		Dimensions:  NewDimensionService(rest),
-		Processes:   NewProcessService(rest),
-		Batches:     NewBatchService(rest),
-		Sandboxes:   NewSandboxService(rest),
-		Hierarchies: NewHierarchyService(rest),
-		Elements:    NewElementService(rest),
-		Subsets:     NewSubsetService(rest),
-		Cells:       NewCellService(rest),
-		Files:       NewFileService(rest),
-		Cubes:       NewCubeService(rest),
-		Views:       NewViewService(rest),
-		Chores:      NewChoreService(rest),
-		Users:       NewUserService(rest),
-		Security:    NewSecurityService(rest),
-		Jobs:        NewJobService(rest),
-		Threads:     NewThreadService(rest),
-		Sessions:    NewSessionService(rest),
-		Monitoring:  NewMonitoringService(rest),
-		Server:      NewServerService(rest),
+		rest:          rest,
+		Dimensions:    NewDimensionService(rest),
+		Processes:     NewProcessService(rest),
+		Batches:       NewBatchService(rest),
+		Sandboxes:     NewSandboxService(rest),
+		Hierarchies:   NewHierarchyService(rest),
+		Elements:      NewElementService(rest),
+		Subsets:       NewSubsetService(rest),
+		Cells:         NewCellService(rest),
+		Files:         NewFileService(rest),
+		Cubes:         NewCubeService(rest),
+		Views:         NewViewService(rest),
+		Chores:        NewChoreService(rest),
+		Users:         NewUserService(rest),
+		Security:      NewSecurityService(rest),
+		Jobs:          NewJobService(rest),
+		Threads:       NewThreadService(rest),
+		Sessions:      NewSessionService(rest),
+		Monitoring:    NewMonitoringService(rest),
+		Server:        NewServerService(rest),
+		Configuration: NewConfigurationService(rest),
 	}, nil
 }
 

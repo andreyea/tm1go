@@ -70,8 +70,9 @@ type AuditLogQuery struct {
 type ServerService struct {
 	rest *RestService
 
-	process *ProcessService
-	users   *UserService
+	process       *ProcessService
+	users         *UserService
+	configuration *ConfigurationService
 
 	lastTransactionLogDeltaRequest string
 	lastAuditLogDeltaRequest       string
@@ -81,9 +82,10 @@ type ServerService struct {
 // NewServerService creates a new ServerService instance.
 func NewServerService(rest *RestService) *ServerService {
 	return &ServerService{
-		rest:    rest,
-		process: NewProcessService(rest),
-		users:   NewUserService(rest),
+		rest:          rest,
+		process:       NewProcessService(rest),
+		users:         NewUserService(rest),
+		configuration: NewConfigurationService(rest),
 	}
 }
 
@@ -378,43 +380,31 @@ func (ss *ServerService) GetLastProcessMessageFromMessageLog(ctx context.Context
 }
 
 func (ss *ServerService) GetServerName(ctx context.Context) (string, error) {
-	return ss.getStringValue(ctx, "/Configuration/ServerName/$value")
+	return ss.configuration.GetServerName(ctx)
 }
 
 func (ss *ServerService) GetProductVersion(ctx context.Context) (string, error) {
-	return ss.getStringValue(ctx, "/Configuration/ProductVersion/$value")
+	return ss.configuration.GetProductVersion(ctx)
 }
 
 func (ss *ServerService) GetAdminHost(ctx context.Context) (string, error) {
-	if err := ss.requirePreV12(); err != nil {
-		return "", err
-	}
-	return ss.getStringValue(ctx, "/Configuration/AdminHost/$value")
+	return ss.configuration.GetAdminHost(ctx)
 }
 
 func (ss *ServerService) GetDataDirectory(ctx context.Context) (string, error) {
-	if err := ss.requirePreV12(); err != nil {
-		return "", err
-	}
-	return ss.getStringValue(ctx, "/Configuration/DataBaseDirectory/$value")
+	return ss.configuration.GetDataDirectory(ctx)
 }
 
 func (ss *ServerService) GetConfiguration(ctx context.Context) (map[string]interface{}, error) {
-	return ss.getConfigMap(ctx, "/Configuration")
+	return ss.configuration.GetAll(ctx)
 }
 
 func (ss *ServerService) GetStaticConfiguration(ctx context.Context) (map[string]interface{}, error) {
-	if err := ss.requireOpsAdmin(ctx); err != nil {
-		return nil, err
-	}
-	return ss.getConfigMap(ctx, "/StaticConfiguration")
+	return ss.configuration.GetStatic(ctx)
 }
 
 func (ss *ServerService) GetActiveConfiguration(ctx context.Context) (map[string]interface{}, error) {
-	if err := ss.requireOpsAdmin(ctx); err != nil {
-		return nil, err
-	}
-	return ss.getConfigMap(ctx, "/ActiveConfiguration")
+	return ss.configuration.GetActive(ctx)
 }
 
 func (ss *ServerService) GetAPIMetadata(ctx context.Context) ([]byte, error) {
@@ -427,10 +417,7 @@ func (ss *ServerService) GetAPIMetadata(ctx context.Context) ([]byte, error) {
 }
 
 func (ss *ServerService) UpdateStaticConfiguration(ctx context.Context, configuration map[string]interface{}) error {
-	if err := ss.requireOpsAdmin(ctx); err != nil {
-		return err
-	}
-	return ss.rest.JSON(ctx, "PATCH", "/StaticConfiguration", configuration, nil)
+	return ss.configuration.UpdateStatic(ctx, configuration)
 }
 
 func (ss *ServerService) SaveData(ctx context.Context) error {
@@ -519,28 +506,6 @@ func (ss *ServerService) GetAllMessageLoggerLevel(ctx context.Context) ([]map[st
 		return nil, err
 	}
 	return response.Value, nil
-}
-
-func (ss *ServerService) getConfigMap(ctx context.Context, endpoint string) (map[string]interface{}, error) {
-	var cfg map[string]interface{}
-	if err := ss.rest.JSON(ctx, "GET", endpoint, nil, &cfg); err != nil {
-		return nil, err
-	}
-	delete(cfg, "@odata.context")
-	return cfg, nil
-}
-
-func (ss *ServerService) getStringValue(ctx context.Context, endpoint string) (string, error) {
-	resp, err := ss.rest.Get(ctx, endpoint)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
 }
 
 func (ss *ServerService) getRawMap(ctx context.Context, endpoint string) (map[string]interface{}, error) {
