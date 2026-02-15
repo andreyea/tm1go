@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/url"
 	"strings"
+
+	"github.com/andreyea/tm1go/pkg/models"
 )
 
 // FileService handles operations for server-side files.
@@ -44,12 +46,12 @@ func (fs *FileService) GetAllNames(ctx context.Context, numberOfLevels int) ([]s
 	}
 	defer resp.Body.Close()
 
-	result := Content{}
+	result := models.Content{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	names := ExtractNamesFromContent(result)
+	names := models.ExtractNamesFromContent(result)
 	return names, nil
 }
 

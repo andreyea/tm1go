@@ -28,6 +28,10 @@ func TestTM1Service_ServicesInitialized(t *testing.T) {
 		t.Error("Processes service is nil")
 	}
 
+	if service.Batches == nil {
+		t.Error("Batches service is nil")
+	}
+
 	if service.Hierarchies == nil {
 		t.Error("Hierarchies service is nil")
 	}

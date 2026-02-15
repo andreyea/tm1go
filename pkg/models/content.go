@@ -1,4 +1,4 @@
-package tm1
+package models
 
 // Content represents a TM1 content item (file or folder) with optional nested contents.
 type Content struct {
