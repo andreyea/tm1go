@@ -13,6 +13,7 @@ type TM1Service struct {
 	Dimensions  *DimensionService
 	Processes   *ProcessService
 	Batches     *BatchService
+	Sandboxes   *SandboxService
 	Hierarchies *HierarchyService
 	Elements    *ElementService
 	Subsets     *SubsetService
@@ -42,6 +43,7 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Dimensions:  NewDimensionService(rest),
 		Processes:   NewProcessService(rest),
 		Batches:     NewBatchService(rest),
+		Sandboxes:   NewSandboxService(rest),
 		Hierarchies: NewHierarchyService(rest),
 		Elements:    NewElementService(rest),
 		Subsets:     NewSubsetService(rest),

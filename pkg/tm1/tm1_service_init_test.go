@@ -32,6 +32,10 @@ func TestTM1Service_ServicesInitialized(t *testing.T) {
 		t.Error("Batches service is nil")
 	}
 
+	if service.Sandboxes == nil {
+		t.Error("Sandboxes service is nil")
+	}
+
 	if service.Hierarchies == nil {
 		t.Error("Hierarchies service is nil")
 	}
