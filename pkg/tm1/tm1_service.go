@@ -28,6 +28,7 @@ type TM1Service struct {
 	Threads     *ThreadService
 	Sessions    *SessionService
 	Monitoring  *MonitoringService
+	Server      *ServerService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -65,6 +66,7 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Threads:     NewThreadService(rest),
 		Sessions:    NewSessionService(rest),
 		Monitoring:  NewMonitoringService(rest),
+		Server:      NewServerService(rest),
 	}, nil
 }
 
