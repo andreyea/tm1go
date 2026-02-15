@@ -1,16 +1,28 @@
 package tm1
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
 func TestTM1Service_ServicesInitialized(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/Configuration/ProductVersion/$value":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("12.0.0"))
+		case "/api/v1/ActiveSession/tm1.Close":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
 	cfg := Config{
-		Address:  "localhost",
-		Port:     8882,
-		SSL:      false,
-		User:     "admin",
-		Password: "apple",
+		BaseURL:             server.URL + "/api/v1",
+		SkipSSLVerification: true,
 	}
 
 	service, err := NewTM1Service(cfg)
