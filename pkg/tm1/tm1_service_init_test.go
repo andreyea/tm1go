@@ -64,6 +64,22 @@ func TestTM1Service_ServicesInitialized(t *testing.T) {
 		t.Error("Security service is nil")
 	}
 
+	if service.Jobs == nil {
+		t.Error("Jobs service is nil")
+	}
+
+	if service.Threads == nil {
+		t.Error("Threads service is nil")
+	}
+
+	if service.Sessions == nil {
+		t.Error("Sessions service is nil")
+	}
+
+	if service.Monitoring == nil {
+		t.Error("Monitoring service is nil")
+	}
+
 	// Test that Rest() returns the underlying rest service
 	if service.Rest() == nil {
 		t.Error("Rest() returned nil")

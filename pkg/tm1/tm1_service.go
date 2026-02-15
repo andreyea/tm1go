@@ -24,6 +24,10 @@ type TM1Service struct {
 	Chores      *ChoreService
 	Users       *UserService
 	Security    *SecurityService
+	Jobs        *JobService
+	Threads     *ThreadService
+	Sessions    *SessionService
+	Monitoring  *MonitoringService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -57,6 +61,10 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Chores:      NewChoreService(rest),
 		Users:       NewUserService(rest),
 		Security:    NewSecurityService(rest),
+		Jobs:        NewJobService(rest),
+		Threads:     NewThreadService(rest),
+		Sessions:    NewSessionService(rest),
+		Monitoring:  NewMonitoringService(rest),
 	}, nil
 }
 
