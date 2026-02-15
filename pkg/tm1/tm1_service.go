@@ -22,6 +22,8 @@ type TM1Service struct {
 	Cubes       *CubeService
 	Views       *ViewService
 	Chores      *ChoreService
+	Users       *UserService
+	Security    *SecurityService
 }
 
 // NewTM1Service constructs a TM1Service with the supplied configuration.
@@ -53,6 +55,8 @@ func NewTM1Service(cfg Config, opts ...RestOption) (*TM1Service, error) {
 		Cubes:       NewCubeService(rest),
 		Views:       NewViewService(rest),
 		Chores:      NewChoreService(rest),
+		Users:       NewUserService(rest),
+		Security:    NewSecurityService(rest),
 	}, nil
 }
 
