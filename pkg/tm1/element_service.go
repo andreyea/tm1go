@@ -18,6 +18,15 @@ type ElementService struct {
 	rest *RestService
 }
 
+// MDXExecuteParams defines parameters for ExecuteSetMDX requests.
+type MDXExecuteParams struct {
+	MDX               string
+	TopRecords        *int
+	MemberProperties  []string
+	ParentProperties  []string
+	ElementProperties []string
+}
+
 // NewElementService creates a new ElementService instance
 func NewElementService(rest *RestService) *ElementService {
 	return &ElementService{
@@ -121,6 +130,45 @@ func (es *ElementService) Exists(ctx context.Context, dimensionName, hierarchyNa
 			return false, nil
 		}
 		return false, fmt.Errorf("check element existence: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return true, nil
+}
+
+// HierarchyExists checks if a hierarchy exists in a dimension.
+func (es *ElementService) HierarchyExists(ctx context.Context, dimensionName, hierarchyName string) (bool, error) {
+	endpoint := fmt.Sprintf(
+		"/Dimensions('%s')/Hierarchies('%s')",
+		url.PathEscape(dimensionName),
+		url.PathEscape(hierarchyName),
+	)
+
+	resp, err := es.rest.Get(ctx, endpoint)
+	if err != nil {
+		if httpErr, ok := err.(*HTTPError); ok && httpErr.StatusCode == 404 {
+			return false, nil
+		}
+		return false, fmt.Errorf("check hierarchy existence: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return true, nil
+}
+
+// AttributeCubeExists checks if the element-attribute cube exists for a dimension.
+func (es *ElementService) AttributeCubeExists(ctx context.Context, dimensionName string) (bool, error) {
+	endpoint := fmt.Sprintf(
+		"/Cubes('%s')",
+		url.PathEscape("}ElementAttributes_"+dimensionName),
+	)
+
+	resp, err := es.rest.Get(ctx, endpoint)
+	if err != nil {
+		if httpErr, ok := err.(*HTTPError); ok && httpErr.StatusCode == 404 {
+			return false, nil
+		}
+		return false, fmt.Errorf("check attribute cube existence: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -695,6 +743,74 @@ func (es *ElementService) DeleteElementAttribute(ctx context.Context, dimensionN
 	defer resp.Body.Close()
 
 	return nil
+}
+
+// ExecuteSetMDX executes an MDX set expression and returns the expanded tuples axis.
+func (es *ElementService) ExecuteSetMDX(ctx context.Context, params MDXExecuteParams) (*Axis, error) {
+	top := ""
+	if params.TopRecords != nil {
+		top = fmt.Sprintf("$top=%d;", *params.TopRecords)
+	}
+
+	if len(params.MemberProperties) == 0 {
+		params.MemberProperties = []string{"Name"}
+	}
+
+	normalizeAttributes := func(properties []string) []string {
+		for i, property := range properties {
+			if strings.HasPrefix(property, "Attributes/") {
+				properties[i] = strings.ReplaceAll(property, " ", "")
+			}
+		}
+		return properties
+	}
+
+	params.MemberProperties = normalizeAttributes(params.MemberProperties)
+	params.ParentProperties = normalizeAttributes(params.ParentProperties)
+	params.ElementProperties = normalizeAttributes(params.ElementProperties)
+
+	selectMemberProperties := "$select=" + strings.Join(params.MemberProperties, ",")
+
+	expandClauses := make([]string, 0, 2)
+	if len(params.ParentProperties) > 0 {
+		expandClauses = append(
+			expandClauses,
+			"Parent($select="+strings.Join(params.ParentProperties, ",")+")",
+		)
+	}
+	if len(params.ElementProperties) > 0 {
+		expandClauses = append(
+			expandClauses,
+			"Element($select="+strings.Join(params.ElementProperties, ",")+")",
+		)
+	}
+
+	expandProperties := ""
+	if len(expandClauses) > 0 {
+		expandProperties = ";$expand=" + strings.Join(expandClauses, ",")
+	}
+
+	endpoint := "/ExecuteMDXSetExpression?$expand=Tuples(" + top +
+		"$expand=Members(" + selectMemberProperties +
+		expandProperties + "))"
+
+	body, err := json.Marshal(map[string]string{"MDX": params.MDX})
+	if err != nil {
+		return nil, fmt.Errorf("marshal mdx payload: %w", err)
+	}
+
+	resp, err := es.rest.Post(ctx, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("execute set mdx: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var axis Axis
+	if err := json.NewDecoder(resp.Body).Decode(&axis); err != nil {
+		return nil, fmt.Errorf("decode mdx axis: %w", err)
+	}
+
+	return &axis, nil
 }
 
 // AddEdges adds edges to a hierarchy

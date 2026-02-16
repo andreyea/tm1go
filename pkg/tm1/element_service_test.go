@@ -415,3 +415,110 @@ func TestElementService_GetElementTypes(t *testing.T) {
 		t.Errorf("expected Element1 to be Numeric, got %s", types["Element1"])
 	}
 }
+
+func TestElementService_HierarchyExists(t *testing.T) {
+	service, server := setupTestService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/Dimensions('TestDim')/Hierarchies('ExistingHierarchy')" {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"Name":"ExistingHierarchy"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":{"code":"404","message":"Not Found"}}`))
+	}))
+	defer server.Close()
+
+	exists, err := service.HierarchyExists(context.Background(), "TestDim", "ExistingHierarchy")
+	if err != nil {
+		t.Fatalf("HierarchyExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("expected hierarchy to exist")
+	}
+
+	exists, err = service.HierarchyExists(context.Background(), "TestDim", "MissingHierarchy")
+	if err != nil {
+		t.Fatalf("HierarchyExists for missing hierarchy failed: %v", err)
+	}
+	if exists {
+		t.Error("expected hierarchy to not exist")
+	}
+}
+
+func TestElementService_AttributeCubeExists(t *testing.T) {
+	service, server := setupTestService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "ElementAttributes_TestDim") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"Name":"}ElementAttributes_TestDim"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":{"code":"404","message":"Not Found"}}`))
+	}))
+	defer server.Close()
+
+	exists, err := service.AttributeCubeExists(context.Background(), "TestDim")
+	if err != nil {
+		t.Fatalf("AttributeCubeExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("expected attribute cube to exist")
+	}
+
+	exists, err = service.AttributeCubeExists(context.Background(), "MissingDim")
+	if err != nil {
+		t.Fatalf("AttributeCubeExists for missing cube failed: %v", err)
+	}
+	if exists {
+		t.Error("expected attribute cube to not exist")
+	}
+}
+
+func TestElementService_ExecuteSetMDX(t *testing.T) {
+	top := 3
+	service, server := setupTestService(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if !strings.HasSuffix(r.URL.Path, "/ExecuteMDXSetExpression") {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if !strings.Contains(r.URL.RawQuery, "$expand=Tuples($top=3;$expand=Members(") {
+			t.Errorf("unexpected query: %s", r.URL.RawQuery)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"Ordinal": 0,
+			"Cardinality": 1,
+			"Tuples": [
+				{
+					"Ordinal": 0,
+					"Members": [
+						{"Name": "A", "UniqueName": "[Dim].[A]"}
+					]
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	axis, err := service.ExecuteSetMDX(context.Background(), MDXExecuteParams{
+		MDX:              "{[Dim].[A]}",
+		TopRecords:       &top,
+		MemberProperties: []string{"Name", "Attributes/My Attr"},
+	})
+	if err != nil {
+		t.Fatalf("ExecuteSetMDX failed: %v", err)
+	}
+
+	if axis == nil {
+		t.Fatal("expected axis response, got nil")
+	}
+	if axis.Cardinality != 1 {
+		t.Errorf("expected cardinality 1, got %d", axis.Cardinality)
+	}
+	if len(axis.Tuples) != 1 || len(axis.Tuples[0].Members) != 1 {
+		t.Errorf("expected one tuple with one member, got tuples=%d", len(axis.Tuples))
+	}
+}
