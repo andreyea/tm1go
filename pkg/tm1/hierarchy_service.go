@@ -111,6 +111,75 @@ func (hs *HierarchyService) GetAllNames(ctx context.Context, dimensionName strin
 	return names, nil
 }
 
+// GetElementAttributeNames retrieves attribute names in a hierarchy.
+//
+// When attributeType is nil, all attribute names are returned.
+// TM1 element attribute type values:
+//   - 0: Numeric
+//   - 1: String
+//   - 2: Alias
+func (hs *HierarchyService) GetElementAttributeNames(ctx context.Context, dimensionName, hierarchyName string, attributeType *int) ([]string, error) {
+	if hierarchyName == "" {
+		hierarchyName = dimensionName
+	}
+
+	endpoint := fmt.Sprintf(
+		"/Dimensions('%s')/Hierarchies('%s')?$expand=ElementAttributes($select=Name)",
+		url.PathEscape(dimensionName),
+		url.PathEscape(hierarchyName),
+	)
+
+	if attributeType != nil {
+		endpoint = fmt.Sprintf(
+			"/Dimensions('%s')/Hierarchies('%s')?$expand=ElementAttributes($select=Name;$filter=Type%%20eq%%20%d)",
+			url.PathEscape(dimensionName),
+			url.PathEscape(hierarchyName),
+			*attributeType,
+		)
+	}
+
+	resp, err := hs.rest.Get(ctx, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("get hierarchy element attribute names: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		ElementAttributes []struct {
+			Name string `json:"Name"`
+		} `json:"ElementAttributes"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode hierarchy element attribute names: %w", err)
+	}
+
+	names := make([]string, len(result.ElementAttributes))
+	for i, attr := range result.ElementAttributes {
+		names[i] = attr.Name
+	}
+
+	return names, nil
+}
+
+// GetNumericAttributeNames retrieves numeric attribute names (Type eq 0) in a hierarchy.
+func (hs *HierarchyService) GetNumericAttributeNames(ctx context.Context, dimensionName, hierarchyName string) ([]string, error) {
+	numericType := 0
+	return hs.GetElementAttributeNames(ctx, dimensionName, hierarchyName, &numericType)
+}
+
+// GetStringAttributeNames retrieves string attribute names (Type eq 1) in a hierarchy.
+func (hs *HierarchyService) GetStringAttributeNames(ctx context.Context, dimensionName, hierarchyName string) ([]string, error) {
+	stringType := 1
+	return hs.GetElementAttributeNames(ctx, dimensionName, hierarchyName, &stringType)
+}
+
+// GetAliasAttributeNames retrieves alias attribute names (Type eq 2) in a hierarchy.
+func (hs *HierarchyService) GetAliasAttributeNames(ctx context.Context, dimensionName, hierarchyName string) ([]string, error) {
+	aliasType := 2
+	return hs.GetElementAttributeNames(ctx, dimensionName, hierarchyName, &aliasType)
+}
+
 // Update updates an existing hierarchy
 func (hs *HierarchyService) Update(ctx context.Context, hierarchy *models.Hierarchy, keepExistingAttributes bool) error {
 	if hierarchy.DimensionName == "" {
