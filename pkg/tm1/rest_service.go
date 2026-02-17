@@ -238,7 +238,7 @@ func (rs *RestService) Request(ctx context.Context, method, endpoint string, bod
 		return nil, err
 	}
 
-	rs.logger.Printf("tm1go %s %s", req.Method, req.URL)
+	rs.logRequest(req, "")
 
 	resp, err := rs.client.Do(req)
 	if err != nil {
@@ -344,7 +344,7 @@ func (rs *RestService) Logout(ctx context.Context) error {
 		return fmt.Errorf("build logout request: %w", err)
 	}
 
-	rs.logger.Printf("tm1go %s %s", req.Method, req.URL)
+	rs.logRequest(req, "")
 
 	resp, err := rs.client.Do(req)
 	if err != nil {
@@ -423,7 +423,7 @@ func (rs *RestService) RequestAsync(ctx context.Context, method, endpoint string
 		return nil, "", err
 	}
 
-	rs.logger.Printf("tm1go %s %s (async)", req.Method, req.URL)
+	rs.logRequest(req, " (async)")
 
 	resp, err := rs.client.Do(req)
 	if err != nil {
@@ -897,6 +897,44 @@ func cloneHeader(in http.Header) http.Header {
 		}
 	}
 	return out
+}
+
+func (rs *RestService) logRequest(req *http.Request, suffix string) {
+	payload := requestPayloadForLog(req, 4096)
+	if payload == "" {
+		rs.logger.Printf("tm1go %s %s%s", req.Method, req.URL, suffix)
+		return
+	}
+
+	rs.logger.Printf("tm1go %s %s%s payload=%s", req.Method, req.URL, suffix, payload)
+}
+
+func requestPayloadForLog(req *http.Request, maxBytes int) string {
+	if req == nil || req.GetBody == nil {
+		return ""
+	}
+
+	bodyCopy, err := req.GetBody()
+	if err != nil {
+		return fmt.Sprintf("<payload-read-error: %v>", err)
+	}
+	defer bodyCopy.Close()
+
+	data, err := io.ReadAll(io.LimitReader(bodyCopy, int64(maxBytes+1)))
+	if err != nil {
+		return fmt.Sprintf("<payload-read-error: %v>", err)
+	}
+
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" {
+		return ""
+	}
+
+	if len(data) > maxBytes {
+		return strings.TrimSpace(string(data[:maxBytes])) + "...(truncated)"
+	}
+
+	return trimmed
 }
 
 // defaultLogger implements basic logging to stdout

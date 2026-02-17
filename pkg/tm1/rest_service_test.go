@@ -2,6 +2,7 @@ package tm1
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -207,6 +208,45 @@ func TestRestServiceWithLogger(t *testing.T) {
 	}
 }
 
+func TestRestServiceLogsPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		Address: "localhost",
+		Port:    8882,
+		SSL:     false,
+	}
+
+	logger := &testLogger{}
+	rs, err := NewRestService(cfg, WithLogger(logger))
+	if err != nil {
+		t.Fatalf("NewRestService() failed: %v", err)
+	}
+
+	testURL := server.URL + "/api/v1"
+	rs.baseURL, _ = rs.baseURL.Parse(testURL)
+
+	ctx := context.Background()
+	resp, err := rs.Post(ctx, "/test", strings.NewReader(`{"a":1}`))
+	if err != nil {
+		t.Fatalf("Post() failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if len(logger.messages) == 0 {
+		t.Fatal("expected at least one log message")
+	}
+
+	last := logger.messages[len(logger.messages)-1]
+	if !strings.Contains(last, `payload={"a":1}`) {
+		t.Fatalf("expected payload in log message, got: %s", last)
+	}
+}
+
 func TestRestServiceWithAuthProvider(t *testing.T) {
 	cfg := Config{
 		Address: "localhost",
@@ -307,5 +347,5 @@ type testLogger struct {
 }
 
 func (l *testLogger) Printf(format string, args ...any) {
-	l.messages = append(l.messages, format)
+	l.messages = append(l.messages, fmt.Sprintf(format, args...))
 }
