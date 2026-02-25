@@ -773,3 +773,456 @@ func (cs *CellService) UpdateCellsetFromDataframeViaBlob(ctx context.Context, cu
 
 	return nil
 }
+
+// CalculationType represents the type of calculation for a cell.
+type CalculationType int
+
+const (
+	CalculationTypeSimple        CalculationType = 0
+	CalculationTypeConsolidation CalculationType = 1
+	CalculationTypeRule          CalculationType = 2
+)
+
+// CalculationComponent represents a component in a cell calculation trace.
+type CalculationComponent struct {
+	Cube       *models.Cube           `json:"Cube,omitempty"`
+	Tuple      []Element              `json:"Tuple,omitempty"`
+	Type       CalculationType        `json:"Type,omitempty"`
+	Status     CellStatus             `json:"Status,omitempty"`
+	Value      interface{}            `json:"Value,omitempty"`
+	Statements []string               `json:"Statements,omitempty"`
+	Components []CalculationComponent `json:"Components,omitempty"`
+}
+
+// FedCellDescriptor describes whether a cell is properly fed.
+type FedCellDescriptor struct {
+	Cube  *models.Cube `json:"Cube,omitempty"`
+	Tuple []Element    `json:"Tuple,omitempty"`
+	Fed   bool         `json:"Fed"`
+}
+
+// FeederTrace represents the result of a feeder trace operation.
+type FeederTrace struct {
+	FedCells   []FedCellDescriptor `json:"FedCells,omitempty"`
+	Statements []string            `json:"Statements,omitempty"`
+}
+
+// RuleSyntaxError represents a syntax error found in cube rules.
+type RuleSyntaxError struct {
+	LineNumber int    `json:"LineNumber,omitempty"`
+	Message    string `json:"Message,omitempty"`
+}
+
+// composeODataTupleFromElements builds an OData tuple binding from element names and dimension names.
+// elements and dimensions must be in the same order and have the same length.
+func (cs *CellService) composeODataTupleFromElements(cubeName string, elements []string, dimensions []string) (map[string]interface{}, error) {
+	if len(dimensions) == 0 {
+		var err error
+		dimensions, err = cs.getDimensionNamesForCube(context.Background(), cubeName)
+		if err != nil {
+			return nil, fmt.Errorf("get dimensions: %w", err)
+		}
+	}
+
+	if len(elements) != len(dimensions) {
+		return nil, fmt.Errorf("elements count (%d) must match dimensions count (%d)", len(elements), len(dimensions))
+	}
+
+	tupleBindings := make([]string, 0, len(elements))
+	for i, elem := range elements {
+		dim := dimensions[i]
+		hier := dim // Default hierarchy has same name as dimension
+		tupleBindings = append(tupleBindings, fmt.Sprintf("Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
+			url.PathEscape(dim), url.PathEscape(hier), url.PathEscape(elem)))
+	}
+
+	return map[string]interface{}{
+		"Tuple@odata.bind": tupleBindings,
+	}, nil
+}
+
+// TraceCellCalculation traces the calculation of a single cell.
+// Returns the calculation components including rule statements, consolidation components and their values.
+// depth controls how many levels of component recursion to return.
+func (cs *CellService) TraceCellCalculation(ctx context.Context, cubeName string, elements []string, dimensions []string, sandboxName string, depth int) (*CalculationComponent, error) {
+	if depth <= 0 {
+		depth = 1
+	}
+
+	// Build $expand and $select for component depth
+	expandQuery := ""
+	selectQuery := ""
+	for x := 1; x <= depth; x++ {
+		componentDepth := ""
+		for j := 0; j < x; j++ {
+			if j > 0 {
+				componentDepth += "/"
+			}
+			componentDepth += "Components"
+		}
+		componentsTupleCube := fmt.Sprintf("%s/Tuple($select=Name,UniqueName,Type),%s/Cube($select=Name)", componentDepth, componentDepth)
+		if expandQuery != "" {
+			expandQuery += ","
+		}
+		expandQuery += componentsTupleCube
+
+		componentFields := fmt.Sprintf("%s/Type,%s/Value,%s/Statements", componentDepth, componentDepth, componentDepth)
+		if selectQuery != "" {
+			selectQuery += ","
+		}
+		selectQuery += componentFields
+	}
+
+	endpoint := fmt.Sprintf("/Cubes('%s')/tm1.TraceCellCalculation?$select=Type,Value,Statements,%s&$expand=Tuple($select=Name,UniqueName,Type),%s",
+		url.PathEscape(cubeName), selectQuery, expandQuery)
+
+	if sandboxName != "" {
+		endpoint = addSandboxParam(endpoint, sandboxName)
+	}
+
+	body, err := cs.composeODataTupleFromElements(cubeName, elements, dimensions)
+	if err != nil {
+		return nil, fmt.Errorf("compose tuple: %w", err)
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+
+	resp, err := cs.rest.Post(ctx, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("trace cell calculation: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result CalculationComponent
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode trace result: %w", err)
+	}
+
+	return &result, nil
+}
+
+// TraceCellFeeders traces the feeders from a cell.
+// Returns the feeder statements and the collection of fed cells.
+func (cs *CellService) TraceCellFeeders(ctx context.Context, cubeName string, elements []string, dimensions []string, sandboxName string) (*FeederTrace, error) {
+	endpoint := fmt.Sprintf("/Cubes('%s')/tm1.TraceFeeders?$select=Statements,FedCells&$expand=FedCells/Tuple($select=Name,UniqueName,Type),FedCells/Cube($select=Name)",
+		url.PathEscape(cubeName))
+
+	if sandboxName != "" {
+		endpoint = addSandboxParam(endpoint, sandboxName)
+	}
+
+	body, err := cs.composeODataTupleFromElements(cubeName, elements, dimensions)
+	if err != nil {
+		return nil, fmt.Errorf("compose tuple: %w", err)
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+
+	resp, err := cs.rest.Post(ctx, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("trace cell feeders: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result FeederTrace
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode feeder trace: %w", err)
+	}
+
+	return &result, nil
+}
+
+// CheckCellFeeders checks whether the components of a consolidated cell are properly fed.
+// Returns a list of fed cell descriptors indicating which components are not properly fed.
+func (cs *CellService) CheckCellFeeders(ctx context.Context, cubeName string, elements []string, dimensions []string, sandboxName string) ([]FedCellDescriptor, error) {
+	endpoint := fmt.Sprintf("/Cubes('%s')/tm1.CheckFeeders?$select=Fed&$expand=Tuple($select=Name,UniqueName,Type),Cube($select=Name)",
+		url.PathEscape(cubeName))
+
+	if sandboxName != "" {
+		endpoint = addSandboxParam(endpoint, sandboxName)
+	}
+
+	body, err := cs.composeODataTupleFromElements(cubeName, elements, dimensions)
+	if err != nil {
+		return nil, fmt.Errorf("compose tuple: %w", err)
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+
+	resp, err := cs.rest.Post(ctx, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("check cell feeders: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Value []FedCellDescriptor `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode check feeders result: %w", err)
+	}
+
+	return result.Value, nil
+}
+
+// CheckRules checks cube rules for syntax errors.
+// If rules is empty, the cube's existing rules are checked.
+// Returns a list of RuleSyntaxError; an empty list means the rules are valid.
+func (cs *CellService) CheckRules(ctx context.Context, cubeName string, rules string) ([]RuleSyntaxError, error) {
+	endpoint := fmt.Sprintf("/Cubes('%s')/tm1.CheckRules", url.PathEscape(cubeName))
+
+	body := map[string]interface{}{}
+	if rules != "" {
+		body["Rules"] = rules
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal body: %w", err)
+	}
+
+	resp, err := cs.rest.Post(ctx, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return nil, fmt.Errorf("check rules: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Value []RuleSyntaxError `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode check rules result: %w", err)
+	}
+
+	return result.Value, nil
+}
+
+// postAgainstCellset executes a POST request against a cellset's tm1.Update endpoint.
+// Used for spreading operations.
+func (cs *CellService) postAgainstCellset(ctx context.Context, cellsetID string, payload map[string]interface{}, sandboxName string) error {
+	endpoint := fmt.Sprintf("/Cellsets('%s')/tm1.Update", cellsetID)
+	if sandboxName != "" {
+		endpoint = addSandboxParam(endpoint, sandboxName)
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	resp, err := cs.rest.Post(ctx, endpoint, strings.NewReader(string(data)))
+	if err != nil {
+		return fmt.Errorf("post against cellset: %w", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(io.Discard, resp.Body)
+	return err
+}
+
+// parseDimensionHierarchyElementFromUniqueName parses a unique element name like "[dimension].[element]"
+// or "[dimension].[hierarchy].[element]" and returns (dimension, hierarchy, element).
+func parseDimensionHierarchyElementFromUniqueName(uniqueName string) (string, string, string) {
+	// Remove leading/trailing whitespace
+	uniqueName = strings.TrimSpace(uniqueName)
+
+	// Extract parts between brackets
+	parts := make([]string, 0, 3)
+	for _, segment := range strings.Split(uniqueName, "]") {
+		segment = strings.TrimLeft(segment, ".[")
+		segment = strings.TrimSpace(segment)
+		if segment != "" {
+			parts = append(parts, segment)
+		}
+	}
+
+	switch len(parts) {
+	case 3:
+		return parts[0], parts[1], parts[2]
+	case 2:
+		return parts[0], parts[0], parts[1]
+	default:
+		return uniqueName, uniqueName, uniqueName
+	}
+}
+
+// RelativeProportionalSpread executes a relative proportional spread on a cube.
+// value is the value to spread.
+// uniqueElementNames are the target cell coordinates as unique element names (e.g. "[dim1].[elem1]").
+// referenceUniqueElementNames are the reference cell coordinates as unique element names.
+// referenceCube is the name of the reference cube (uses the same cube if empty).
+func (cs *CellService) RelativeProportionalSpread(ctx context.Context, value float64, cubeName string, uniqueElementNames []string, referenceUniqueElementNames []string, referenceCube string, sandboxName string) error {
+	// Build MDX to create a cellset targeting the cell
+	mdxParts := make([]string, 0, len(uniqueElementNames))
+	for _, uen := range uniqueElementNames {
+		mdxParts = append(mdxParts, "{"+uen+"}")
+	}
+	mdx := fmt.Sprintf("SELECT %s ON 0 FROM [%s]", strings.Join(mdxParts, "*"), cubeName)
+
+	cellsetID, err := cs.CreateCellset(ctx, mdx, sandboxName)
+	if err != nil {
+		return fmt.Errorf("create cellset for spread: %w", err)
+	}
+
+	// Build reference cell bindings
+	refCellBindings := make([]string, 0, len(referenceUniqueElementNames))
+	for _, refUEN := range referenceUniqueElementNames {
+		dim, hier, elem := parseDimensionHierarchyElementFromUniqueName(refUEN)
+		refCellBindings = append(refCellBindings, fmt.Sprintf("Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
+			url.PathEscape(dim), url.PathEscape(hier), url.PathEscape(elem)))
+	}
+
+	if referenceCube == "" {
+		referenceCube = cubeName
+	}
+
+	payload := map[string]interface{}{
+		"BeginOrdinal":             0,
+		"Value":                    fmt.Sprintf("RP%g", value),
+		"ReferenceCell@odata.bind": refCellBindings,
+		"ReferenceCube@odata.bind": fmt.Sprintf("Cubes('%s')", url.PathEscape(referenceCube)),
+	}
+
+	err = cs.postAgainstCellset(ctx, cellsetID, payload, sandboxName)
+	// Always clean up the cellset
+	_ = cs.DeleteCellset(ctx, cellsetID, sandboxName)
+
+	return err
+}
+
+// ClearSpread executes a clear spread on a cube, zeroing out cells at the specified coordinates.
+// uniqueElementNames are the target cell coordinates as unique element names (e.g. "[dim1].[elem1]").
+func (cs *CellService) ClearSpread(ctx context.Context, cubeName string, uniqueElementNames []string, sandboxName string) error {
+	// Build MDX to create a cellset
+	mdxParts := make([]string, 0, len(uniqueElementNames))
+	for _, uen := range uniqueElementNames {
+		mdxParts = append(mdxParts, "{"+uen+"}")
+	}
+	mdx := fmt.Sprintf("SELECT %s ON 0 FROM [%s]", strings.Join(mdxParts, "*"), cubeName)
+
+	cellsetID, err := cs.CreateCellset(ctx, mdx, sandboxName)
+	if err != nil {
+		return fmt.Errorf("create cellset for clear spread: %w", err)
+	}
+
+	// Build reference cell bindings (same as target for clear)
+	refCellBindings := make([]string, 0, len(uniqueElementNames))
+	for _, uen := range uniqueElementNames {
+		dim, hier, elem := parseDimensionHierarchyElementFromUniqueName(uen)
+		refCellBindings = append(refCellBindings, fmt.Sprintf("Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
+			url.PathEscape(dim), url.PathEscape(hier), url.PathEscape(elem)))
+	}
+
+	payload := map[string]interface{}{
+		"BeginOrdinal":             0,
+		"Value":                    "C",
+		"ReferenceCell@odata.bind": refCellBindings,
+	}
+
+	err = cs.postAgainstCellset(ctx, cellsetID, payload, sandboxName)
+	// Always clean up the cellset
+	_ = cs.DeleteCellset(ctx, cellsetID, sandboxName)
+
+	return err
+}
+
+// EqualSpread executes an equal spread on a cube.
+// value is the value to spread equally across leaf cells.
+// uniqueElementNames are the target cell coordinates as unique element names.
+func (cs *CellService) EqualSpread(ctx context.Context, value float64, cubeName string, uniqueElementNames []string, sandboxName string) error {
+	// Build MDX to create a cellset
+	mdxParts := make([]string, 0, len(uniqueElementNames))
+	for _, uen := range uniqueElementNames {
+		mdxParts = append(mdxParts, "{"+uen+"}")
+	}
+	mdx := fmt.Sprintf("SELECT %s ON 0 FROM [%s]", strings.Join(mdxParts, "*"), cubeName)
+
+	cellsetID, err := cs.CreateCellset(ctx, mdx, sandboxName)
+	if err != nil {
+		return fmt.Errorf("create cellset for equal spread: %w", err)
+	}
+
+	// Build reference cell bindings
+	refCellBindings := make([]string, 0, len(uniqueElementNames))
+	for _, uen := range uniqueElementNames {
+		dim, hier, elem := parseDimensionHierarchyElementFromUniqueName(uen)
+		refCellBindings = append(refCellBindings, fmt.Sprintf("Dimensions('%s')/Hierarchies('%s')/Elements('%s')",
+			url.PathEscape(dim), url.PathEscape(hier), url.PathEscape(elem)))
+	}
+
+	payload := map[string]interface{}{
+		"BeginOrdinal":             0,
+		"Value":                    fmt.Sprintf("S%g", value),
+		"ReferenceCell@odata.bind": refCellBindings,
+	}
+
+	err = cs.postAgainstCellset(ctx, cellsetID, payload, sandboxName)
+	_ = cs.DeleteCellset(ctx, cellsetID, sandboxName)
+
+	return err
+}
+
+// ClearWithMDX clears (zeros out) a slice of a cube based on an MDX query.
+// This creates a temporary MDX view and uses a TI process with ViewZeroOut to clear the data.
+// Requires admin permissions.
+func (cs *CellService) ClearWithMDX(ctx context.Context, cubeName string, mdx string, sandboxName string) error {
+	processService := NewProcessService(cs.rest)
+
+	viewName := fmt.Sprintf("}tm1go_%s", RandomString(16))
+
+	// Create the MDX view
+	viewBody := map[string]interface{}{
+		"@odata.type": "#ibm.tm1.api.v1.MDXView",
+		"Name":        viewName,
+		"MDX":         mdx,
+	}
+
+	viewPayload, err := json.Marshal(viewBody)
+	if err != nil {
+		return fmt.Errorf("marshal view body: %w", err)
+	}
+
+	viewEndpoint := fmt.Sprintf("/Cubes('%s')/Views", url.PathEscape(cubeName))
+	resp, err := cs.rest.Post(ctx, viewEndpoint, strings.NewReader(string(viewPayload)))
+	if err != nil {
+		return fmt.Errorf("create view: %w", err)
+	}
+	resp.Body.Close()
+
+	// Ensure view cleanup
+	defer func() {
+		deleteEndpoint := fmt.Sprintf("/Cubes('%s')/Views('%s')", url.PathEscape(cubeName), url.PathEscape(viewName))
+		if delResp, delErr := cs.rest.Delete(ctx, deleteEndpoint); delErr == nil {
+			delResp.Body.Close()
+		}
+	}()
+
+	// Build and execute TI process with ViewZeroOut
+	enableSandbox := ""
+	if sandboxName != "" {
+		enableSandbox = fmt.Sprintf("ServerActiveSandbox('%s');", sandboxName)
+	}
+
+	process := models.NewProcess("")
+	process.PrologProcedure = enableSandbox
+	process.EpilogProcedure = fmt.Sprintf("ViewZeroOut('%s','%s');", cubeName, viewName)
+
+	success, status, _, err := processService.ExecuteProcessWithReturn(ctx, process, nil)
+	if err != nil {
+		return fmt.Errorf("execute clear process: %w", err)
+	}
+	if !success {
+		return fmt.Errorf("clear failed for cube '%s': %s", cubeName, status)
+	}
+
+	return nil
+}
