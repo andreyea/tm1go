@@ -112,6 +112,31 @@ const (
 	CellStatusError CellStatus = 2
 )
 
+func (cs *CellStatus) UnmarshalJSON(data []byte) error {
+	var intValue int
+	if err := json.Unmarshal(data, &intValue); err == nil {
+		*cs = CellStatus(intValue)
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		switch strings.ToLower(strings.TrimSpace(stringValue)) {
+		case "null":
+			*cs = CellStatusNull
+		case "data":
+			*cs = CellStatusData
+		case "error":
+			*cs = CellStatusError
+		default:
+			return fmt.Errorf("invalid cell status: %q", stringValue)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("invalid cell status payload: %s", string(data))
+}
+
 // MemberType represents the type of a member.
 type MemberType int
 
@@ -123,6 +148,35 @@ const (
 	MemberTypeFormula MemberType = 4
 )
 
+func (mt *MemberType) UnmarshalJSON(data []byte) error {
+	var intValue int
+	if err := json.Unmarshal(data, &intValue); err == nil {
+		*mt = MemberType(intValue)
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		switch strings.ToLower(strings.TrimSpace(stringValue)) {
+		case "unknown":
+			*mt = MemberTypeUnknown
+		case "regular":
+			*mt = MemberTypeRegular
+		case "all":
+			*mt = MemberTypeAll
+		case "measure":
+			*mt = MemberTypeMeasure
+		case "formula":
+			*mt = MemberTypeFormula
+		default:
+			return fmt.Errorf("invalid member type: %q", stringValue)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("invalid member type payload: %s", string(data))
+}
+
 // ElementType represents the type of an element.
 type ElementType int
 
@@ -131,6 +185,31 @@ const (
 	ElementTypeString       ElementType = 2
 	ElementTypeConsolidated ElementType = 3
 )
+
+func (et *ElementType) UnmarshalJSON(data []byte) error {
+	var intValue int
+	if err := json.Unmarshal(data, &intValue); err == nil {
+		*et = ElementType(intValue)
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		switch strings.ToLower(strings.TrimSpace(stringValue)) {
+		case "numeric":
+			*et = ElementTypeNumeric
+		case "string":
+			*et = ElementTypeString
+		case "consolidated":
+			*et = ElementTypeConsolidated
+		default:
+			return fmt.Errorf("invalid element type: %q", stringValue)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("invalid element type payload: %s", string(data))
+}
 
 // Hierarchy represents a TM1 hierarchy.
 type Hierarchy struct {
@@ -782,6 +861,31 @@ const (
 	CalculationTypeConsolidation CalculationType = 1
 	CalculationTypeRule          CalculationType = 2
 )
+
+func (ct *CalculationType) UnmarshalJSON(data []byte) error {
+	var intValue int
+	if err := json.Unmarshal(data, &intValue); err == nil {
+		*ct = CalculationType(intValue)
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		switch strings.ToLower(strings.TrimSpace(stringValue)) {
+		case "simple":
+			*ct = CalculationTypeSimple
+		case "consolidation":
+			*ct = CalculationTypeConsolidation
+		case "rule":
+			*ct = CalculationTypeRule
+		default:
+			return fmt.Errorf("invalid calculation type: %q", stringValue)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("invalid calculation type payload: %s", string(data))
+}
 
 // CalculationComponent represents a component in a cell calculation trace.
 type CalculationComponent struct {
